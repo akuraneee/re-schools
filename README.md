@@ -1,0 +1,61 @@
+# re:schools
+
+Приложение для Android к электронному дневнику [schools.by](https://schools.by).
+
+- **Главная**: новые отметки с прошлого захода (кроме сегодняшних), отметки за сегодня и ДЗ на завтра
+  (в пятницу — на понедельник).
+- **Дневник**: полный дневник по неделям — уроки, ДЗ и отметки, переход по неделям стрелками или свайпом.
+
+Вход — на самом сайте schools.by, приложение пароль не видит. Дневник и снимок отметок хранятся только на телефоне.
+Без сети показываются сохранённые данные.
+
+## Установка
+
+Откройте на телефоне ссылку
+[re-schools-android.apk](https://github.com/akuraneee/re-schools/releases/latest/download/re-schools-android.apk)
+и установите файл (разрешите установку из этого источника, если телефон спросит). Затем войдите в schools.by.
+
+## Как это устроено
+
+```
+web/            интерфейс (HTML/CSS/JS без сборки и зависимостей) — общий для Android и Electron
+  lib/utils.js    даты, форматирование, названия предметов   ┐ из schools++ (src/utils.js, src/parser.js),
+  lib/parser.js   разбор HTML недели дневника + ДЗ           ┘ в парсер добавлены ДЗ и список дней
+  lib/diary.js    загрузка недель, поиск четверти по ссылкам, кэш в localStorage
+  lib/logic.js    отметки за сегодня, ДЗ на завтра, новые отметки
+  app.js, app.css интерфейс
+android/        оболочка: WebView без зависимостей (minSdk 26, targetSdk 35)
+electron/       та же оболочка для компьютера + самопроверка
+test/           тесты (jsdom) и выдуманный schools.by (fake-site.js)
+```
+
+Интерфейс открывается по адресу `https://<школа>.schools.by/__rs/index.html`: эти файлы оболочка отдаёт сама
+(Android — `shouldInterceptRequest`, Electron — `protocol.handle`), а запросы к дневнику со страницы идут на тот же
+домен с куками входа — как у самого сайта, без CORS и без хранения пароля.
+После входа на schools.by сайт открывает `/pupil/<id>` (или `/parent/<id>`) — оболочка переключается на приложение.
+
+Electron на Android не запускается, поэтому для телефона — WebView-оболочка, а Electron — версия для компьютера
+и для проверки на выдуманном сайте.
+
+## Команды
+
+```bash
+npm install
+npm test            # тесты логики на jsdom
+npm run demo        # Electron на выдуманном demo.schools.by
+npm run selftest    # самопроверка в Electron со скриншотами (RS_SHOT_DIR)
+npm start           # Electron с настоящим schools.by
+gradle -p android assembleRelease   # APK; нужны JDK 17, Gradle 8.11.1, Android SDK 35
+```
+
+APK собирает GitHub Actions (`.github/workflows/build.yml`) на каждый push; в `main` — ещё и релиз
+с файлом `re-schools-android.apk`. Постоянный ключ подписи — секреты `ANDROID_KEYSTORE_BASE64`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` (как в schools++); без них каждая сборка
+подписана новым временным ключом и не ставится поверх старой.
+
+## Что не проверено на настоящем сайте
+
+- Куда schools.by переводит после входа. Оболочка ждёт `/pupil/<id>` или `/parent/<id>` на поддомене школы.
+- Где стоит ДЗ: по описанию из schools++ — в строке урока, на котором его задали. Тогда ДЗ на завтра берётся
+  с предыдущего урока того же предмета (под ним подпись «задано …»). Если окажется наоборот — переключатель
+  в настройках «Где schools.by пишет ДЗ».

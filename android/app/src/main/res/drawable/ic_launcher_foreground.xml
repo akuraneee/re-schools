@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Раскрытая тетрадь, как на значке в web/icon.svg. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M38,37a4,4 0,0 1,4 -4h30v38H42a4,4 0,0 0,-4 4z M38,75a4,4 0,0 0,4 4h30v-8 M48,45h16 M48,54h11" />
+</vector>
