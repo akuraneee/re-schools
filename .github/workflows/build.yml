@@ -1,11 +1,12 @@
-# Тесты и APK на каждый push и pull request. При push в main — релиз v<major>.<minor>.<номер сборки>
-# с файлом re-schools-android.apk (major.minor — из package.json).
+# Тесты и APK на каждый push в любую ветку (APK — в артефактах запуска). При push в main — релиз
+# v<major>.<minor>.<номер сборки> с файлом re-schools-android.apk (major.minor — из package.json).
+# pull_request не нужен: проверки push-запуска и так видны в PR из ветки этого репозитория.
 name: Сборка
 
 on:
   push:
-    branches: [main]
-  pull_request:
+    branches: ['**']
+    tags-ignore: ['**']
   workflow_dispatch:
 
 permissions:
@@ -73,7 +74,7 @@ jobs:
 
   release:
     name: Релиз
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     needs: [test, android]
     runs-on: ubuntu-latest
     steps:

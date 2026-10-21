@@ -58,8 +58,9 @@ npm start           # Electron с настоящим schools.by
 gradle -p android assembleRelease   # APK; нужны JDK 17, Gradle 8.11.1, Android SDK 35
 ```
 
-APK собирает GitHub Actions (`.github/workflows/build.yml`) на каждый push; в `main` — ещё и релиз
-с файлом `re-schools-android.apk`. Постоянный ключ подписи — секреты `ANDROID_KEYSTORE_BASE64`,
+APK собирает GitHub Actions (`.github/workflows/build.yml`) на каждый push в любую ветку (файл — в артефактах
+запуска); в `main` — ещё и релиз `v<major>.<minor>.<номер сборки>` с файлом `re-schools-android.apk`
+(major.minor — из `package.json`). Постоянный ключ подписи — секреты `ANDROID_KEYSTORE_BASE64`,
 `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` (как в schools++); без них каждая сборка
 подписана новым временным ключом и не ставится поверх старой.
 

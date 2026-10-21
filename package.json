@@ -1,7 +1,7 @@
 {
   "name": "re-schools",
   "productName": "re:schools",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Дневник schools.by: отметки за сегодня, ДЗ на завтра, новые отметки",
   "private": true,
   "main": "electron/main.js",
