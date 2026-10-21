@@ -40,13 +40,21 @@
         <svg viewBox="0 0 24 24"><path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H20v16H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M4 20.5A1.5 1.5 0 0 0 5.5 22H20v-3"/><path d="M8 8h8M8 12h6"/></svg>
         <span>Дневник</span>
       </button>
+      <button data-tab="stats">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+        <span>Статистика</span>
+      </button>
     </nav>
   </div>
+  <div class="tip hidden" id="tip"></div>
 
   <script src="lib/utils.js"></script>
   <script src="lib/parser.js"></script>
   <script src="lib/diary.js"></script>
   <script src="lib/logic.js"></script>
+  <script src="lib/crawler.js"></script>
+  <script src="lib/stats.js"></script>
+  <script src="lib/charts.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

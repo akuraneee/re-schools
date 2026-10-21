@@ -1,10 +1,14 @@
-// Интерфейс re:schools: «Главная» (новые отметки, отметки за сегодня, ДЗ на завтра), «Дневник» (по неделям), настройки.
+// Интерфейс re:schools: «Главная» (новые отметки, отметки за сегодня, ДЗ на завтра), «Дневник» (по неделям),
+// «Статистика» (средние, четвертные и годовые — из schools++), настройки.
 (function (RS) {
   'use strict';
 
   const $ = (s) => document.querySelector(s);
   const esc = RS.esc;
   const LOGIN_URL = 'https://schools.by/login';
+  // Статистика за год перекачивается не чаще; свежие недели в неё подставляет дневник (RS.mergeWeeks).
+  const STATS_TTL = 6 * 3600 * 1000;
+  const STATS_TABS = [['overview', 'Обзор'], ['subject', 'Предмет'], ['dynamics', 'Динамика']];
 
   const WEEKDAYS_FULL = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
   const WEEKDAYS_ACC = ['воскресенье', 'понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу'];
@@ -12,19 +16,26 @@
   const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 
   const S = {
-    tab: 'home', // home | diary | settings
+    tab: 'home', // home | diary | stats | settings
     prevTab: 'home',
     pupils: RS.store.get('pupils', []),
     pupil: null,
     diary: null,
     visit: null,
-    settings: { hwMode: 'assigned', ...RS.store.get('settings', {}) },
+    settings: { hwMode: 'assigned', threshold: 0.5, ...RS.store.get('settings', {}) },
     loading: false,
     progress: null,
     error: null, // { kind: 'auth' | 'offline' | 'other', text }
     week: RS.mondayOf(RS.today()),
     weekLoading: false,
     needLogin: false,
+    statsTab: 'overview', // overview | subject | dynamics
+    subject: null,
+    sort: { key: 'name', dir: 1 },
+    statsData: null, // результат RS.crawl, хранится в <id>:stats
+    stats: null, // RS.computeStats(statsData)
+    statsLoading: false,
+    statsPages: 0,
   };
 
   // ---------- форматирование ----------
@@ -76,6 +87,9 @@
     S.diary = new RS.Diary(p);
     S.visit = RS.startVisit(RS.store.get(`${p.id}:visit`));
     saveVisit();
+    S.statsData = RS.store.get(`${p.id}:stats`);
+    S.subject = null;
+    recompute();
     S.week = RS.mondayOf(RS.today());
     render();
     refresh();
@@ -94,6 +108,7 @@
       S.lastSync = Date.now();
       RS.store.set(`${S.pupil.id}:lastSync`, S.lastSync);
       saveVisit();
+      mergeDiary();
     } catch (e) {
       S.error = errorOf(e);
     } finally {
@@ -120,11 +135,60 @@
       await S.diary.loadWeek(monday);
       S.visit.seen = RS.snapshot(S.diary.weeks, S.visit.seen?.at || Date.now());
       saveVisit();
+      mergeDiary();
     } catch (e) {
       S.error = errorOf(e);
     } finally {
       S.weekLoading = false;
       if (S.week === monday) render();
+    }
+  }
+
+  function recompute() {
+    S.stats = S.statsData ? RS.computeStats(S.statsData, { threshold: S.settings.threshold, today: RS.today() }) : null;
+  }
+
+  function setStatsData(d) {
+    S.statsData = d;
+    if (S.pupil) RS.store.set(`${S.pupil.id}:stats`, d);
+    recompute();
+  }
+
+  // Недели, перекачанные дневником в этой сессии, — в статистику.
+  function mergeDiary() {
+    if (!S.statsData || !S.diary) return;
+    const d = RS.mergeWeeks(S.statsData, S.diary.weeks, S.diary.links, [...S.diary.expanded]);
+    if (d !== S.statsData) setStatsData(d);
+  }
+
+  const statsStale = () => !S.statsData || Date.now() - S.statsData.fetchedAt > STATS_TTL;
+
+  // full — заново весь год; иначе только текущая и следующие четверти (RS.quartersToRefresh).
+  async function refreshStats(full) {
+    if (!S.pupil || S.statsLoading) return;
+    const pupil = S.pupil;
+    S.statsLoading = true;
+    S.statsPages = 0;
+    S.error = null;
+    render();
+    try {
+      const prev = full ? null : S.statsData;
+      const res = await RS.crawl(pupil, {
+        previous: prev,
+        onlyQuarters: prev ? RS.quartersToRefresh(prev) : null,
+        onProgress: (ctx) => {
+          S.statsPages = ctx.pages;
+          renderStatus();
+          const el = document.getElementById('stats-progress');
+          if (el) el.textContent = statsProgressText();
+        },
+      });
+      if (S.pupil === pupil) setStatsData(res);
+    } catch (e) {
+      S.error = errorOf(e);
+    } finally {
+      S.statsLoading = false;
+      render();
     }
   }
 
@@ -144,14 +208,14 @@
   function render() {
     const app = $('#app');
     app.dataset.tab = S.tab;
-    const titles = { home: 'Главная', diary: 'Дневник', settings: 'Настройки' };
+    const titles = { home: 'Главная', diary: 'Дневник', stats: 'Статистика', settings: 'Настройки' };
     $('#title').textContent = S.needLogin ? 're:schools' : titles[S.tab];
     $('#who').textContent = S.pupil ? S.pupil.name : '';
     $('#back').classList.toggle('hidden', S.tab !== 'settings');
     $('#tabs').classList.toggle('hidden', S.needLogin || S.tab === 'settings');
     $('#refresh').classList.toggle('hidden', S.needLogin || S.tab === 'settings');
     $('#settings-btn').classList.toggle('hidden', S.needLogin || S.tab === 'settings');
-    $('#refresh').classList.toggle('spin', S.loading || S.weekLoading);
+    $('#refresh').classList.toggle('spin', S.loading || S.weekLoading || (S.tab === 'stats' && S.statsLoading));
     for (const b of document.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.tab === S.tab);
     renderStatus();
 
@@ -159,6 +223,7 @@
     if (S.needLogin) view.innerHTML = loginView();
     else if (S.tab === 'home') view.innerHTML = homeView();
     else if (S.tab === 'diary') view.innerHTML = diaryView();
+    else if (S.tab === 'stats') view.innerHTML = statsView();
     else view.innerHTML = settingsView();
   }
 
@@ -172,6 +237,8 @@
         : '<button data-act="refresh">Повторить</button>');
     } else if (S.loading && S.progress && hasData()) {
       html = `Обновляю дневник… ${S.progress[0]} из ${S.progress[1]}`;
+    } else if (S.statsLoading && S.tab === 'stats' && S.stats) {
+      html = `Обновляю статистику… страниц: ${S.statsPages}`;
     }
     el.innerHTML = html;
     el.classList.toggle('err', err);
@@ -305,17 +372,307 @@
     return bar + days;
   }
 
+  // ---------- статистика (из schools++, src/ui.js) ----------
+
+  const fmt = RS.fmt, fmtSigned = RS.fmtSigned;
+
+  const mark = (v, title) => (v == null ? '<span class="muted">—</span>'
+    : `<span class="mark xs l${RS.markLevel(v)}"${title ? ` title="${esc(title)}"` : ''}>${v}</span>`);
+
+  const qv = (s) => (!s || !s.n ? '<span class="muted">—</span>'
+    : `<span class="qv" title="${s.n} ${RS.plural(s.n, 'отметка', 'отметки', 'отметок')}, среднее ${fmt(s.avg, 3)}">${mark(s.rounded)}<span class="ex">${fmt(s.avg)}</span></span>`);
+
+  const trend = (t) => {
+    if (t == null) return '<span class="flat">—</span>';
+    const txt = `${fmtSigned(t, 1)}/мес`;
+    if (t > 0.25) return `<span class="up" title="Отметки растут">▲ ${txt}</span>`;
+    if (t < -0.25) return `<span class="down" title="Отметки снижаются">▼ ${txt}</span>`;
+    return `<span class="flat" title="Без заметных изменений">● ${txt}</span>`;
+  };
+
+  const delta = (d) => (d == null ? '<span class="flat">—</span>'
+    : `<span class="${d > 0.05 ? 'up' : d < -0.05 ? 'down' : 'flat'}">${fmtSigned(d)}</span>`);
+
+  const qShort = (q) => {
+    const m = q.name.match(/\d+/);
+    return m ? `${m[0]} четв.` : q.name;
+  };
+
+  const kpi = (t, v, s, small) =>
+    `<div class="kpi"><div class="t">${t}</div><div class="v">${v}${small ? `<small>${small}</small>` : ''}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`;
+
+  const bands = (st) => st.quarters.filter((q) => st.ranges[q.id])
+    .map((q) => ({ start: st.ranges[q.id].start, end: st.ranges[q.id].end, label: qShort(q) }));
+
+  const quartersOf = (st) => Math.max(4, st.quarters.length);
+
+  const statsProgressText = () => `Загружаю дневник за учебный год…${S.statsPages ? ` страниц: ${S.statsPages}` : ''}`;
+
+  function statsView() {
+    const seg = `<div class="segbar"><div class="seg">${STATS_TABS.map(([k, t]) =>
+      `<button data-act="stab" data-key="${k}" class="${S.statsTab === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>`;
+    const st = S.stats;
+    if (!st) {
+      if (S.statsLoading) {
+        return seg + `<div class="card"><div class="empty" id="stats-progress">${statsProgressText()}</div>
+          <p class="note">В первый раз загружаются все недели с начала года — это может занять до минуты.</p></div>` + skeleton(4) + skeleton(3);
+      }
+      return seg + `<div class="card"><div class="empty">Статистика ещё не загружена.</div>
+        <div class="actions" style="margin-top:12px"><button class="btn block" data-act="stats-load">Загрузить</button></div></div>`;
+    }
+    if (!st.subjects.length) return seg + '<div class="card"><div class="empty">Отметок за этот учебный год пока нет.</div></div>';
+    RS.charts.defaultWidth = Math.max(280, Math.min(920, $('#view').clientWidth - 64));
+    const body = S.statsTab === 'subject' ? subjectView(st) : S.statsTab === 'dynamics' ? dynamicsView(st) : overviewView(st);
+    return seg + `<div class="stats">${body}</div>`;
+  }
+
+  function overviewView(st) {
+    const o = st.overall;
+    const curQ = st.quarters.find((q) => q.id === st.current);
+    const pct = o.lessons ? (o.absences / o.lessons) * 100 : 0;
+    let h = '<div class="kpis">';
+    h += kpi(`Средний балл${curQ ? ' · ' + esc(qShort(curQ)) : ''}`, fmt(o.currentExact), 'среднее по предметам', `по округл. ${fmt(o.currentRounded)}`);
+    h += kpi('Годовой средний', fmt(o.yearExact), 'по четвертным отметкам', `по округл. ${fmt(o.yearRounded)}`);
+    h += kpi('Все отметки', fmt(o.avgAll), `${o.marks} ${RS.plural(o.marks, 'отметка', 'отметки', 'отметок')}`);
+    h += kpi('Последние 30 дней', fmt(o.recent30), o.before30 != null ? `к прошлым 30 дням: ${delta(o.recent30 - o.before30)}` : `${o.recent30n} отметок`);
+    h += kpi('Пропуски', String(o.absences), `из ${o.lessons} уроков · ${fmt(pct, 1)}%`);
+    h += '</div>';
+
+    h += '<h2 class="sec">Предметы</h2>';
+    h += subjectCards(st, sortSubjects(st));
+    h += '<p class="note">Крупная цифра — округлённая отметка, мелкая — точное среднее. Годовая считается как среднее округлённых четвертных. ' +
+      `Порог округления: ${fmt(st.threshold)} (меняется в настройках).</p>`;
+    if (st.noMarks.length) h += `<p class="note">Без отметок: ${st.noMarks.map((s) => esc(s.name)).join(', ')}.</p>`;
+
+    // Близко к повышению / на грани понижения — по текущей четверти.
+    const near = [], risk = [];
+    for (const s of st.subjects) {
+      const c = s.current;
+      if (!c || !c.n) continue;
+      const toUp = c.rounded < 10 ? c.rounded + st.threshold - c.avg : Infinity;
+      const toDown = c.avg - (c.rounded - 1 + st.threshold);
+      if (toUp <= 0.2) near.push({ s, v: toUp });
+      if (c.rounded > 1 && toDown < 0.15) risk.push({ s, v: toDown });
+    }
+    near.sort((a, b) => a.v - b.v);
+    risk.sort((a, b) => a.v - b.v);
+    h += `<section class="card"><div class="card-h"><h2>Почти следующая отметка</h2>${curQ ? `<span class="sub">${esc(qShort(curQ))}</span>` : ''}</div>` +
+      (near.length ? near.map(({ s }) => {
+        const f = s.forecast.up[0];
+        return `<p>${esc(s.name)}: ${fmt(s.current.avg)} → ${mark(s.current.rounded + 1)} нужно ${f.count}×${f.mark}</p>`;
+      }).join('') : '<div class="empty">Нет предметов рядом с границей</div>') + '</section>';
+    h += '<section class="card"><div class="card-h"><h2>На грани понижения</h2></div>' +
+      (risk.length ? risk.map(({ s }) => `<p>${esc(s.name)}: ${fmt(s.current.avg)}. Отметка ниже ${s.forecast.down.minSafe} опустит до ${mark(s.forecast.down.dropTo)}</p>`).join('')
+        : '<div class="empty">Таких предметов нет</div>') + '</section>';
+
+    h += '<section class="card"><div class="card-h"><h2>Распределение отметок</h2></div>' + RS.charts.distribution(st.distribution) + '</section>';
+    return h;
+  }
+
+  const yearCell = (st, s) => (s.year.quarters
+    ? `<span class="qv">${mark(s.year.rounded)}<span class="ex">${fmt(s.year.exact)}</span></span>` +
+      (s.year.quarters < quartersOf(st) ? `<span class="tag">${s.year.quarters}/${quartersOf(st)}</span>` : '')
+    : '<span class="muted">—</span>');
+
+  function subjectCards(st, subs) {
+    const sorts = [['name', 'по названию'], ['year', 'по годовой'], ...(st.current ? [[`q:${st.current}`, 'по текущей четверти']] : []), ['trend', 'по тренду'], ['abs', 'по пропускам']];
+    let h = `<select class="input msort" data-act="msort">${sorts.map(([k, t]) => `<option value="${k}"${S.sort.key === k ? ' selected' : ''}>Сортировка ${t}</option>`).join('')}</select>`;
+    h += '<div class="scards">';
+    for (const s of subs) {
+      h += `<div class="scard" data-act="subject" data-key="${esc(s.key)}">` +
+        `<div class="sc-top"><span class="sc-name">${esc(s.name)}</span><span class="sc-year"><span class="muted small">год</span> ${yearCell(st, s)}</span></div>` +
+        '<div class="sc-qs">' + st.quarters.map((q) =>
+          `<div class="sc-q${q.id === st.current ? ' cur' : ''}"><span class="sc-ql">${esc(qShort(q))}</span>${qv(s.byQ[q.id])}</div>`).join('') + '</div>' +
+        `<div class="sc-foot"><span>${s.all.n} отм. · ср. ${fmt(s.all.avg)}${s.absences ? ` · пропуски ${s.absences}` : ''}</span>${trend(s.trend)}${RS.charts.sparkline(s.running.slice(-15).map((r) => r.avg))}</div>` +
+        '</div>';
+    }
+    h += '<div class="scard total"><div class="sc-top"><span class="sc-name">Средний балл</span>' +
+      `<span class="sc-year"><span class="muted small">год</span> ${fmt(st.overall.yearExact)}</span></div><div class="sc-qs">` +
+      st.quarters.map((q) => {
+        const t = st.quarterTotals[q.id];
+        return `<div class="sc-q${q.id === st.current ? ' cur' : ''}"><span class="sc-ql">${esc(qShort(q))}</span>${t.subjects ? `<b>${fmt(t.exact)}</b>` : '—'}</div>`;
+      }).join('') + '</div></div>';
+    return h + '</div>';
+  }
+
+  function sortSubjects(st) {
+    const { key, dir } = S.sort;
+    const val = (s) => {
+      if (key === 'name') return s.name;
+      if (key === 'year') return s.year.exact;
+      if (key === 'all') return s.all.avg;
+      if (key === 'n') return s.all.n;
+      if (key === 'abs') return s.absences;
+      if (key === 'trend') return s.trend;
+      if (key.startsWith('q:')) return s.byQ[key.slice(2)]?.avg;
+      return 0;
+    };
+    return [...st.subjects].sort((a, b) => {
+      const x = val(a), y = val(b);
+      if (typeof x === 'string') return dir * x.localeCompare(y, 'ru');
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      return dir * (x - y);
+    });
+  }
+
+  function subjectView(st) {
+    const s = st.subjects.find((x) => x.key === S.subject) || st.subjects[0];
+    S.subject = s.key;
+    const curQ = st.quarters.find((q) => q.id === st.current);
+    const c = s.current;
+
+    let h = '<select class="input subj-pick" data-act="pick-subject">' +
+      st.subjects.map((x) => `<option value="${esc(x.key)}"${x.key === s.key ? ' selected' : ''}>${esc(x.name)}</option>`).join('') +
+      '</select>';
+
+    h += '<div class="kpis">';
+    if (c && c.n) h += kpi(esc(curQ ? qShort(curQ) : 'Четверть'), mark(c.rounded), `${c.n} отметок`, fmt(c.avg, 3));
+    else h += kpi(esc(curQ ? qShort(curQ) : 'Четверть'), '—', 'отметок пока нет');
+    h += kpi('Годовая', s.year.quarters ? mark(s.year.rounded) : '—', `по ${s.year.quarters} из ${quartersOf(st)} четв.`, fmt(s.year.exact, 3));
+    h += kpi('За год (все отметки)', fmt(s.all.avg), `${s.all.n} отметок`);
+    h += kpi('Медиана · мода', `${fmt(s.all.median, 1)} · ${s.all.mode}`, `мин ${s.all.min}, макс ${s.all.max}`);
+    h += kpi('Разброс', fmt(s.all.std), 'стандартное отклонение');
+    h += kpi('Тренд', trend(s.trend), s.prev5 != null ? `последние 5: ${fmt(s.last5)} (были ${fmt(s.prev5)})` : '');
+    h += kpi('Пропуски', String(s.absences), `из ${s.lessons} уроков`);
+    h += '</div>';
+
+    // Прогноз на четверть
+    const f = s.forecast;
+    h += '<section class="card"><div class="card-h"><h2>Что нужно в этой четверти</h2></div>';
+    if (!f) h += '<div class="empty">Отметок в текущей четверти пока нет</div>';
+    else {
+      if (f.target && f.up.length) {
+        h += `<p>Чтобы получить ${mark(f.target)}: ` + f.up.map((u) => `<b>${u.count}</b>×${u.mark}`).join(' или ') + '</p>';
+      } else if (!f.target) h += '<p>Уже максимальная отметка 🎉</p>';
+      if (f.down) {
+        h += f.down.anySafe
+          ? `<p>Одна любая отметка не опустит ниже ${mark(c.rounded)}</p>`
+          : `<p>Одна отметка ниже <b>${f.down.minSafe}</b> опустит до ${mark(f.down.dropTo)}</p>`;
+      }
+    }
+    h += '</section>';
+    h += '<section class="card"><div class="card-h"><h2>А что если…</h2></div><div class="whatif">' +
+      '<input class="input" data-act="whatif" inputmode="numeric" placeholder="добавить отметки, напр. 9 10 8">' +
+      '<span class="whatif-out muted">введите отметки</span></div>' +
+      '<p class="note">Считается для текущей четверти.</p></section>';
+
+    // График: отметки + накопленное среднее внутри четверти
+    let prevQ = null;
+    const avgPts = s.running.map((r) => {
+      const p = { date: r.date, y: r.avg, break: r.q !== prevQ };
+      prevQ = r.q;
+      return p;
+    });
+    const dots = s.marks.map((m) => ({ date: m.date, y: m.v, cls: `lv${RS.markLevel(m.v)}`, title: `${RS.fmtDate(m.date)}: ${m.v}` }));
+    h += '<section class="card"><div class="card-h"><h2>Динамика</h2></div>' + RS.charts.line({
+      bands: bands(st),
+      series: [
+        { points: dots, line: false, dots: true, r: 4 },
+        { points: avgPts, cls: '', step: false },
+      ],
+    });
+    h += '<div class="legend"><span><i class="dot"></i>отметка</span><span><i></i>среднее в четверти на эту дату</span></div></section>';
+
+    // По четвертям
+    h += '<section class="card"><div class="card-h"><h2>Отметки по четвертям</h2></div>';
+    for (const q of st.quarters) {
+      const ms = s.marks.filter((m) => m.q === q.id);
+      const sq = s.byQ[q.id];
+      h += `<div class="qblock"><div class="qt">${esc(q.name)} ${sq.n ? `${mark(sq.rounded)} <span class="muted">${fmt(sq.avg, 3)} · ${sq.n} отм. · мин ${sq.min}, макс ${sq.max}</span>` : '<span class="muted">нет отметок</span>'}</div>`;
+      if (ms.length) h += '<div class="chips">' + ms.map((m) => mark(m.v, RS.fmtDate(m.date))).join('') + '</div>';
+      h += '</div>';
+    }
+    return h + '</section>';
+  }
+
+  function dynamicsView(st) {
+    let h = '<section class="card"><div class="card-h"><h2>Средний балл по неделям</h2></div>';
+    h += RS.charts.line({
+      bands: bands(st),
+      yMin: Math.min(4, Math.floor(Math.min(10, ...st.weekly.map((w) => w.avg)))), yMax: 10,
+      series: [
+        { points: st.weekly.map((w) => ({ date: w.week, y: w.avg, title: `Неделя с ${RS.fmtDate(w.week)}: ${fmt(w.avg)} (${w.n} отм.)` })), cls: 'soft', dots: true, r: 3 },
+        { points: st.weekly.map((w) => ({ date: w.week, y: w.cumulative })), cls: 'alt' },
+      ],
+    });
+    h += '<div class="legend"><span><i class="dot"></i>среднее за неделю</span><span><i class="alt"></i>накопленное среднее с начала года</span></div></section>';
+
+    h += '<section class="card"><div class="card-h"><h2>Недели</h2></div>' +
+      (st.bestWeek ? `<p>Лучшая: с ${RS.fmtDate(st.bestWeek.week)}, ${fmt(st.bestWeek.avg)} (${st.bestWeek.n} отм.)</p>` : '') +
+      (st.worstWeek ? `<p>Худшая: с ${RS.fmtDate(st.worstWeek.week)}, ${fmt(st.worstWeek.avg)} (${st.worstWeek.n} отм.)</p>` : '') +
+      (st.weekly.length ? `<p class="muted">Недель с отметками: ${st.weekly.length}, в среднем ${fmt(st.overall.marks / st.weekly.length, 1)} отм. в неделю</p>` : '<div class="empty">Нет данных</div>') +
+      '</section>';
+    h += '<section class="card"><div class="card-h"><h2>По дням недели</h2></div>' +
+      RS.charts.hbars(st.byWeekday.filter((d) => d.n).map((d) => ({ label: d.day, value: d.avg, note: `${d.n} отм.` }))) + '</section>';
+
+    const rows = st.subjects.map((s) => ({ s, d: s.recent30 != null && s.before30 != null ? s.recent30 - s.before30 : null }))
+      .sort((a, b) => (b.d ?? -99) - (a.d ?? -99));
+    h += '<section class="card"><div class="card-h"><h2>Изменения по предметам</h2></div>';
+    h += '<div class="tscroll"><table class="tbl"><thead><tr><th>Предмет</th><th class="dk" title="С 60-го по 30-й день назад">30–60 дней назад</th><th>Последние 30 дней</th><th>Изменение</th>' +
+      '<th class="dk">Предыдущие 5</th><th class="dk">Последние 5</th><th>Тренд</th></tr></thead><tbody>';
+    for (const { s, d } of rows) {
+      h += `<tr class="link" data-act="subject" data-key="${esc(s.key)}"><td class="subj">${esc(s.name)}</td><td class="dk">${fmt(s.before30)}</td><td>${fmt(s.recent30)}</td>` +
+        `<td>${delta(d)}</td><td class="dk">${fmt(s.prev5)}</td><td class="dk">${fmt(s.last5)}</td><td>${trend(s.trend)}</td></tr>`;
+    }
+    h += '</tbody></table></div></section>';
+
+    h += '<section class="card"><div class="card-h"><h2>По четвертям</h2></div><div class="tscroll"><table class="tbl"><thead><tr><th>Четверть</th><th>Средний балл (точно)</th><th>По округлённым</th><th class="dk">Предметов</th><th>Отметок</th></tr></thead><tbody>';
+    for (const q of st.quarters) {
+      const t = st.quarterTotals[q.id];
+      h += `<tr><td>${esc(q.name)}${st.inProgress[q.id] ? ' <span class="tag">идёт</span>' : ''}</td><td>${fmt(t.exact, 3)}</td><td>${fmt(t.rounded, 3)}</td><td class="dk">${t.subjects}</td><td>${t.marks}</td></tr>`;
+    }
+    return h + '</tbody></table></div></section>';
+  }
+
+  function onWhatIf(input) {
+    const out = document.querySelector('.whatif-out');
+    const s = S.stats?.subjects.find((x) => x.key === S.subject);
+    const extra = RS.parseMarkText(input.value).marks;
+    if (!s || !extra.length) { out.className = 'whatif-out muted'; out.textContent = 'введите отметки'; return; }
+    const c = s.current && s.current.n ? s.current : { n: 0, sum: 0 };
+    const n = c.n + extra.length, sum = c.sum + extra.reduce((a, b) => a + b, 0);
+    const avg = sum / n;
+    out.className = 'whatif-out';
+    out.innerHTML = `среднее ${fmt(avg, 3)} → ${mark(RS.roundMark(avg, S.settings.threshold))}` +
+      (c.n ? ` <span class="muted">(сейчас ${fmt(c.avg, 3)})</span>` : '');
+  }
+
+  // На телефоне нет наведения: подсказку точки графика показываем по нажатию.
+  let tipTimer = null;
+  function showTip(text) {
+    const tip = $('#tip');
+    tip.textContent = text;
+    tip.classList.remove('hidden');
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => tip.classList.add('hidden'), 2500);
+  }
+
   function settingsView() {
     const pupils = S.pupils.length > 1 ? `<section class="card"><div class="card-h"><h2>Ученик</h2></div>
       ${S.pupils.map((p) => `<label class="opt"><input type="radio" name="pupil" value="${esc(p.id)}" ${S.pupil && S.pupil.id === p.id ? 'checked' : ''}>
         <div>${esc(p.name)}</div></label>`).join('')}</section>` : '';
     const mode = S.settings.hwMode;
+    const d = S.statsData;
+    const statsInfo = d ? `<div class="meta">Загружено ${when(d.fetchedAt)} · страниц: ${d.pages} · уроков: ${d.lessons.length} · ` +
+      `отметок: ${d.lessons.reduce((a, l) => a + l.marks.length, 0)}</div>` +
+      `<div class="meta">Четверти: ${d.quarters.map((q) => `${esc(q.name)} (id ${esc(q.id)})`).join(', ')}</div>` +
+      (d.errors?.length ? `<div class="meta err">Ошибки при загрузке (${d.errors.length}): ${d.errors.slice(0, 5).map(esc).join('; ')}</div>` : '') : '';
     return pupils + `<section class="card">
         <div class="card-h"><h2>Где schools.by пишет ДЗ</h2></div>
         <label class="opt"><input type="radio" name="hw" value="assigned" ${mode === 'assigned' ? 'checked' : ''}>
           <div><div>На уроке, где его задали</div><div class="meta">ДЗ на завтра берётся с предыдущего урока по тому же предмету. Так устроен дневник schools.by.</div></div></label>
         <label class="opt"><input type="radio" name="hw" value="due" ${mode === 'due' ? 'checked' : ''}>
           <div><div>На уроке, к которому его сделать</div><div class="meta">Выберите, если на главной ДЗ оказывается от прошлого урока.</div></div></label>
+      </section>
+      <section class="card">
+        <div class="card-h"><h2>Статистика</h2></div>
+        <label class="field"><span>Округлять вверх, если дробная часть ≥</span>
+          <input class="input" type="number" name="threshold" min="0.05" max="0.95" step="0.05" inputmode="decimal" value="${S.settings.threshold}"></label>
+        <div class="meta">0,5: 7,50 → 8, 7,49 → 7</div>
+        ${statsInfo}
+        <div class="actions" style="margin-top:12px"><button class="btn ghost block" data-act="stats-full"${S.statsLoading ? ' disabled' : ''}>Загрузить статистику заново</button></div>
       </section>
       <section class="card"><div class="actions">
         <button class="btn ghost block" data-act="site">Открыть сайт schools.by</button>
@@ -341,22 +698,35 @@
       openWeek(S.week);
       requestAnimationFrame(() => document.getElementById('today')?.scrollIntoView({ block: 'center' }));
     }
+    if (tab === 'stats' && statsStale()) refreshStats(false);
+  }
+
+  function setStatsTab(key) {
+    S.statsTab = key;
+    render();
+    $('#view').scrollTop = 0;
   }
 
   document.addEventListener('click', (e) => {
     const tabBtn = e.target.closest('.tabs button');
     if (tabBtn) return setTab(tabBtn.dataset.tab);
+    const titled = e.target.closest('circle, rect');
+    if (titled && titled.querySelector('title')) return showTip(titled.querySelector('title').textContent);
     const el = e.target.closest('[data-act]');
     if (!el) return;
     const act = el.dataset.act;
     if (act === 'login') location.href = LOGIN_URL;
-    else if (act === 'refresh') refresh();
+    else if (act === 'refresh') (S.tab === 'stats' ? refreshStats(false) : refresh());
+    else if (act === 'stab') setStatsTab(el.dataset.key);
+    else if (act === 'subject') { S.subject = el.dataset.key; setStatsTab('subject'); }
+    else if (act === 'stats-load') refreshStats(false);
+    else if (act === 'stats-full') refreshStats(true);
     else if (act === 'week') openWeek(RS.addDays(S.week, +el.dataset.d));
     else if (act === 'thisweek') openWeek(RS.mondayOf(RS.today()));
     else if (act === 'site') location.href = S.pupil ? `${S.pupil.origin}/pupil/${S.pupil.id}` : 'https://schools.by/';
     else if (act === 'clear') {
       if (!confirm('Удалить сохранённый дневник? Он заново загрузится с сайта.')) return;
-      for (const k of ['links', 'weeks', 'visit', 'lastSync']) RS.store.remove(`${S.pupil.id}:${k}`);
+      for (const k of ['links', 'weeks', 'visit', 'lastSync', 'stats']) RS.store.remove(`${S.pupil.id}:${k}`);
       S.tab = 'home';
       selectPupil(S.pupil);
     }
@@ -369,10 +739,32 @@
     } else if (e.target.name === 'pupil') {
       const p = S.pupils.find((x) => x.id === e.target.value);
       if (p) { S.tab = 'home'; selectPupil(p); }
+    } else if (e.target.name === 'threshold') {
+      const v = parseFloat(String(e.target.value).replace(',', '.'));
+      if (v > 0 && v < 1) {
+        S.settings.threshold = v;
+        RS.store.set('settings', S.settings);
+        recompute();
+      }
+    } else if (e.target.dataset.act === 'pick-subject') {
+      S.subject = e.target.value;
+      render();
+    } else if (e.target.dataset.act === 'msort') {
+      const key = e.target.value;
+      S.sort = { key, dir: key === 'name' ? 1 : -1 };
+      render();
     }
   });
 
-  $('#refresh').addEventListener('click', () => (S.tab === 'diary' && S.diary ? reloadWeek() : refresh()));
+  document.addEventListener('input', (e) => {
+    if (e.target.dataset.act === 'whatif') onWhatIf(e.target);
+  });
+
+  $('#refresh').addEventListener('click', () => {
+    if (S.tab === 'diary' && S.diary) reloadWeek();
+    else if (S.tab === 'stats') refreshStats(false);
+    else refresh();
+  });
   $('#settings-btn').addEventListener('click', () => setTab('settings'));
   $('#back').addEventListener('click', () => setTab(S.prevTab));
 
@@ -381,10 +773,11 @@
     await openWeek(S.week);
   }
 
-  // Системная кнопка «Назад» на Android (оболочка вызывает RS.app.back()): из настроек и дневника — на главную.
-  // false — обрабатывать нечего, оболочка сворачивает приложение.
+  // Системная кнопка «Назад» на Android (оболочка вызывает RS.app.back()): из настроек, дневника и статистики —
+  // на главную (из раздела статистики — сначала в «Обзор»). false — обрабатывать нечего, оболочка сворачивает приложение.
   function back() {
     if (S.needLogin || S.tab === 'home') return false;
+    if (S.tab === 'stats' && S.statsTab !== 'overview') { setStatsTab('overview'); return true; }
     setTab(S.tab === 'settings' ? S.prevTab : 'home');
     return true;
   }
@@ -450,6 +843,6 @@
     selectPupil(p);
   }
 
-  RS.app = { state: S, refresh, openWeek, setTab, back };
+  RS.app = { state: S, refresh, refreshStats, openWeek, setTab, back };
   init();
 })(globalThis.RS);

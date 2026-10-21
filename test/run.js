@@ -1,5 +1,5 @@
 // Тесты логики на jsdom: разбор недели (с ДЗ), загрузка дневника через выдуманный сайт, переходы между четвертями,
-// ДЗ на завтра, новые отметки с прошлого захода. Запуск: npm test
+// ДЗ на завтра, новые отметки с прошлого захода, статистика за год. Запуск: npm test
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -21,7 +21,7 @@ function makeWindow(site) {
     }
     throw new Error('redirect loop');
   };
-  for (const f of ['utils.js', 'parser.js', 'diary.js', 'logic.js']) {
+  for (const f of ['utils.js', 'parser.js', 'diary.js', 'logic.js', 'crawler.js', 'stats.js', 'charts.js']) {
     w.eval(fs.readFileSync(path.join(__dirname, '..', 'web', 'lib', f), 'utf8'));
   }
   w.RS.today = () => site.today;
@@ -172,6 +172,83 @@ const pupil = { id: PID, origin: HOST, name: 'Тестов Тест' };
     const base = RS.snapshot(d.weeks, new Date('2026-10-20T08:00:00').getTime());
     await d.loadWeek('2026-09-21');
     eq(RS.newMarks(d.allLessons(), base, TODAY), []);
+  });
+
+  console.log('Статистика');
+
+  await test('год целиком: все четверти по ссылкам между неделями, без ДЗ, каждая страница — один запрос', async () => {
+    const site = createSite({ today: TODAY });
+    const w = makeWindow(site);
+    const data = await w.RS.crawl(pupil, { today: TODAY, delay: 0 });
+    eq(data.quarters.map((q) => [q.id, q.name]), [['92', '1 четверть'], ['93', '2 четверть'], ['94', '3 четверть'], ['95', '4 четверть']]);
+    const q1 = data.lessons.filter((l) => l.q === '92');
+    eq(q1[0].date, site.quarters[0].from, 'с первой недели четверти');
+    ok(q1.every((l) => l.date <= '2026-10-24'), 'первая четверть кончается до каникул');
+    ok(data.lessons.every((l) => !('hw' in l)), 'ДЗ в статистике не храним');
+    ok(data.lessons.filter((l) => l.date > TODAY).every((l) => !l.marks.length), 'в будущем отметок нет');
+    eq(data.errors, []);
+    const weekReqs = site.requests.filter((p) => p.includes('/week/'));
+    eq(weekReqs.length, new Set(weekReqs).size, 'каждая неделя — один запрос');
+  });
+
+  await test('расчёты: средние, четвертная, годовая, прогноз', async () => {
+    const site = createSite({ today: TODAY });
+    const w = makeWindow(site);
+    const RS = w.RS;
+    const data = await RS.crawl(pupil, { today: TODAY, delay: 0 });
+    const st = RS.computeStats(data, { today: TODAY });
+    eq(st.current, '92');
+    ok(st.inProgress['92'] && !st.inProgress['93'], 'идёт первая четверть');
+    const math = st.subjects.find((s) => s.name === 'Математика');
+    const vals = data.lessons.filter((l) => l.subject === 'Матем.').flatMap((l) => l.marks);
+    eq(math.all.n, vals.length);
+    eq(+math.all.avg.toFixed(6), +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(6));
+    eq(math.current.rounded, RS.roundMark(math.current.avg));
+    eq(math.year.quarters, 1);
+    eq(math.year.rounded, math.current.rounded, 'годовая по одной четверти = четвертная');
+    eq(st.distribution.reduce((a, b) => a + b, 0), st.overall.marks);
+    eq(st.overall.absences, data.lessons.filter((l) => l.absent && l.date <= TODAY).length);
+    // прогноз: столько десяток действительно поднимают отметку, а на одну меньше — нет
+    const s = st.subjects.find((x) => x.forecast && x.forecast.up.length && x.forecast.up[0].mark === 10);
+    const { n, sum, rounded } = s.current;
+    const k = s.forecast.up[0].count;
+    eq(RS.roundMark((sum + 10 * k) / (n + k)), rounded + 1);
+    if (k > 1) eq(RS.roundMark((sum + 10 * (k - 1)) / (n + k - 1)), rounded);
+    // графики рисуются
+    ok(RS.charts.distribution(st.distribution).startsWith('<svg'));
+    ok(RS.charts.line({ series: [{ points: st.weekly.map((x) => ({ date: x.week, y: x.avg })) }] }).includes('<path'));
+  });
+
+  await test('быстрое обновление — только текущая и будущие четверти; прошлые берутся из сохранённого', async () => {
+    const site = createSite({ today: '2027-01-20' });
+    const w = makeWindow(site);
+    const RS = w.RS;
+    const full = await RS.crawl(pupil, { today: site.today, delay: 0 });
+    eq(full.quarters.map((q) => q.id), ['92', '93', '94', '95']);
+    eq(RS.quartersToRefresh(full, site.today), ['94', '95']);
+    site.requests.length = 0;
+    const quick = await RS.crawl(pupil, { today: site.today, delay: 0, previous: full, onlyQuarters: RS.quartersToRefresh(full, site.today) });
+    ok(!site.requests.some((p) => /quarter\/9[23]\//.test(p)), 'прошлые четверти не перекачиваются');
+    eq(quick.quarters.map((q) => q.id), ['92', '93', '94', '95'], 'четверти не потерялись');
+    eq(quick.lessons.length, full.lessons.length);
+  });
+
+  await test('недели, перекачанные дневником, подставляются в статистику', async () => {
+    const site = createSite({ today: TODAY });
+    const w = makeWindow(site);
+    const RS = w.RS;
+    const data = await RS.crawl(pupil, { today: TODAY, delay: 0 });
+    const { prev } = site.bump();
+    const d = new RS.Diary(pupil, { delay: 0 });
+    await d.refresh(TODAY, null);
+    const merged = RS.mergeWeeks(data, d.weeks, d.links, [...d.expanded]);
+    const num = +Object.keys(site.changed).find((k) => k.startsWith(prev + '|')).split('|')[1];
+    const at = (x) => x.lessons.find((l) => l.date === prev && l.num === num);
+    eq(at(data).marks, [], 'до обновления отметки не было');
+    eq(at(merged).marks, [10], 'новая 10 появилась');
+    eq(merged.lessons.length, data.lessons.length, 'уроки не задвоились');
+    ok(merged.lessons.every((l) => l.q && !('hw' in l)));
+    eq(RS.mergeWeeks(data, {}, {}, []), data, 'нечего подставлять — тот же объект');
   });
 
   console.log(`\n${passed} прошло, ${failed} упало`);

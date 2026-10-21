@@ -1,5 +1,5 @@
 // Самопроверка в настоящем Electron на выдуманном demo.schools.by: вход → приложение → главная, дневник,
-// новые отметки после следующего захода. Скриншоты — в RS_SHOT_DIR (или во временную папку).
+// статистика, новые отметки после следующего захода. Скриншоты — в RS_SHOT_DIR (или во временную папку).
 // Запуск: npm run selftest
 const fs = require('fs');
 const os = require('os');
@@ -53,6 +53,20 @@ module.exports = async function selftest({ ses, site, createWindow }) {
     await js(`document.querySelector('[data-act=week][data-d="7"]').click()`);
     check('каникулы', await waitFor(`${ready} && document.querySelector('#view').textContent.includes('каникулы')`));
 
+    await js(`document.querySelector('.tabs button[data-tab=stats]').click()`);
+    check('статистика: обзор', await waitFor(`!RS.app.state.statsLoading && document.querySelectorAll('.scard').length > 10 && document.querySelectorAll('.kpi').length === 5`, 60000));
+    check('статистика: все четверти', await js(`RS.app.state.stats.quarters.length === 4 && document.querySelector('.sc-qs').children.length === 4`));
+    await shot('stats-overview');
+    await js(`document.querySelector('.scard[data-key]').click()`);
+    check('статистика: предмет', await waitFor(`document.querySelector('.subj-pick') && document.querySelectorAll('.chart .dot').length > 3`));
+    await js(`(() => { const i = document.querySelector('[data-act=whatif]'); i.value = '10 10'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    check('статистика: а что если', await js(`/среднее \\d/.test(document.querySelector('.whatif-out').textContent)`));
+    await shot('stats-subject');
+    await js(`document.querySelector('[data-act=stab][data-key=dynamics]').click()`);
+    check('статистика: динамика', await waitFor(`document.querySelectorAll('.tbl').length === 2 && document.querySelector('.hbars')`));
+    await shot('stats-dynamics');
+    check('назад из раздела статистики — в обзор', await js(`RS.app.back() && RS.app.state.tab === 'stats' && RS.app.state.statsTab === 'overview'`));
+
     // Следующий заход через пару часов: учитель поставил и исправил отметки.
     site.bump();
     // state.visit = null — чтобы при перезагрузке страница не записала «был активен только что».
@@ -60,6 +74,10 @@ module.exports = async function selftest({ ses, site, createWindow }) {
     await sleep(500);
     check('новые отметки после следующего захода', await waitFor(`${ready} && document.querySelector('.card .count')?.textContent === '2'`));
     await shot('home-new');
+    check('новая отметка попала в статистику', await js(`(() => {
+      const t = RS.today(), fresh = RS.newMarks(RS.app.state.diary.allLessons(), RS.app.state.visit.baseline, t);
+      return fresh.every((f) => RS.app.state.statsData.lessons.some((l) => RS.lessonKey(l) === RS.lessonKey(f) && RS.markStr(l) === RS.markStr(f)));
+    })()`));
 
     await js(`document.getElementById('settings-btn').click()`);
     check('настройки', await waitFor(`document.getElementById('title').textContent === 'Настройки'`));
