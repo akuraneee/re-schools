@@ -38,14 +38,39 @@ module.exports = async function selftest({ ses, site, createWindow }) {
     check('после входа открылось приложение', await waitFor(`location.pathname === '/__rs/index.html' && !!window.RS?.app`));
     check('ученик найден', await waitFor(`document.getElementById('who').textContent === 'Тестов Тест'`));
     check('главная загрузилась', await waitFor(ready));
-    const home = await js(`[...document.querySelectorAll('.card-h h2')].map((e) => e.textContent)`);
+    const home = await js(`[...document.querySelectorAll('.card:not(.next) .card-h h2')].map((e) => e.textContent)`);
     check('блоки главной', JSON.stringify(home.slice(0, 2)) === JSON.stringify(['Новые отметки', 'Сегодня']) && /^ДЗ /.test(home[2]));
     check('первый заход: подсказка вместо новых', await js(`document.querySelector('.card .empty').textContent.includes('после этого захода')`));
     check('запросы недели с X-Requested-With', site.requests.some((p) => p.includes('/dnevnik/quarter/')));
     await shot('home-first');
 
+    // Что сейчас — подменяем часы: урок, перемена, утро до уроков (в будни у выдуманной школы уроки каждый день).
+    const setNow = (hm) => js(`(() => { const [h, m] = '${hm}'.split(':').map(Number); RS.now = () => { const d = new Date(); d.setHours(h, m, 0, 0); return d; }; RS.app.tick(); })()`);
+    const weekday = await js(`![0, 6].includes(new Date().getDay())`);
+    if (weekday) {
+      await setNow('09:10');
+      check('сейчас: идёт 2-й урок', await waitFor(`document.querySelector('.card.now .sub')?.textContent.startsWith('2 урок · 9:00–9:45') && document.querySelector('.card.now .left').textContent === 'ещё 35 мин'`));
+      await shot('home-lesson');
+      await setNow('08:50');
+      check('сейчас: перемена и следующий урок', await waitFor(`document.querySelector('.card.mini b')?.textContent === 'Перемена' && [...document.querySelectorAll('.card-h h2')].some((e) => e.textContent === 'Следующий урок')`));
+      await shot('home-break');
+      await setNow('07:00');
+      check('сейчас: неурочное время до уроков', await waitFor(`document.querySelector('.card.mini .sub')?.textContent === 'уроки с 8:00'`));
+      await setNow('09:10');
+    } else {
+      check('выходной: неурочное время', await waitFor(`document.querySelector('.card.mini b')?.textContent === 'Неурочное время'`));
+    }
+
     await js(`document.querySelector('.tabs button[data-tab=diary]').click()`);
     check('дневник', await waitFor(`${ready} && document.querySelectorAll('.day-h').length >= 5`));
+    if (weekday) {
+      check('дневник: идёт урок', await js(`document.querySelector('#today .row.live .pill')?.textContent === 'идёт'`));
+      await setNow('08:50');
+      check('дневник: перемена', await waitFor(`document.querySelector('#today .row.brk')?.textContent.includes('Перемена') && document.querySelector('#today .row.brk').nextElementSibling.querySelector('.num').textContent === '2'`));
+      await js(`document.getElementById('today').scrollIntoView({ block: 'start' })`);
+      await shot('diary-break');
+      await setNow('09:10');
+    }
     await shot('diary');
     await js(`document.querySelector('[data-act=week][data-d="-7"]').click()`);
     check('прошлая неделя', await waitFor(`${ready} && document.querySelector('.range small').textContent === 'прошлая неделя' && document.querySelectorAll('.day-h').length >= 5`));
@@ -81,6 +106,13 @@ module.exports = async function selftest({ ses, site, createWindow }) {
 
     await js(`document.getElementById('settings-btn').click()`);
     check('настройки', await waitFor(`document.getElementById('title').textContent === 'Настройки'`));
+    check('звонки по умолчанию', await js(`document.querySelectorAll('input[name=bell]').length === 16 && document.querySelector('input[name=bell][data-i="1"][data-k="0"]').value === '09:00'`));
+    await js(`document.querySelector('[data-act=bell-add]').click()`);
+    check('звонки: + урок', await js(`JSON.stringify(RS.app.state.settings.bells[8]) === '["16:00","16:45"]' && JSON.parse(localStorage.getItem('rs:settings')).bells.length === 9`));
+    await js(`(() => { const i = document.querySelector('input[name=bell][data-i="0"][data-k="0"]'); i.value = '08:30'; i.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    check('звонки: изменение сохраняется', await js(`RS.app.state.settings.bells[0][0] === '08:30'`));
+    await js(`document.querySelector('[data-act=bell-reset]').click()`);
+    check('звонки: по умолчанию', await js(`RS.app.state.settings.bells.length === 8 && RS.app.state.settings.bells[0][0] === '08:00'`));
     await shot('settings');
     check('назад из настроек', await js(`RS.app.back() && RS.app.state.tab === 'home'`));
   } catch (e) {

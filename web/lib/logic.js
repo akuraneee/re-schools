@@ -1,4 +1,5 @@
-// Что показывать на главной: отметки за сегодня, ДЗ на следующий учебный день, новые отметки с прошлого захода.
+// Что показывать на главной: отметки за сегодня, ДЗ на следующий учебный день, новые отметки с прошлого захода,
+// что идёт сейчас по расписанию звонков.
 (function (RS) {
   'use strict';
 
@@ -86,5 +87,51 @@
     const s = state || {};
     if (s.lastActive && now - s.lastActive < RS.VISIT_GAP) return { ...s, lastActive: now };
     return { baseline: s.seen || null, seen: s.seen || null, lastActive: now };
+  };
+
+  // ---------- расписание звонков и «что сейчас»: урок, перемена или неурочное время ----------
+
+  const pad = (n) => String(n).padStart(2, '0');
+  RS.toMin = (hhmm) => { const [h, m] = String(hhmm).split(':').map(Number); return h * 60 + m; };
+  RS.fromMin = (m) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
+  RS.now = () => new Date(); // в самопроверке подменяется
+
+  // По умолчанию: 1-й урок 8:00–8:45, 2-й 9:00–9:45 и так далее (уроки по 45 минут, перемены по 15).
+  RS.DEFAULT_BELLS = Array.from({ length: 8 }, (_, i) => [RS.fromMin(480 + i * 60), RS.fromMin(525 + i * 60)]);
+
+  // Звонки из настроек; испорченные (пустые, конец раньше начала) — как нет.
+  RS.validBells = (bells) => (Array.isArray(bells) && bells.length ? bells : RS.DEFAULT_BELLS)
+    .map((b) => (Array.isArray(b) && /^\d\d?:\d\d$/.test(b[0]) && /^\d\d?:\d\d$/.test(b[1]) && RS.toMin(b[0]) < RS.toMin(b[1]) ? b : null));
+
+  // Уроки дня по номерам со временем звонков. Несколько уроков с одним номером (группы) — в одном пункте.
+  RS.daySchedule = function (lessons, date, bells) {
+    const valid = RS.validBells(bells);
+    const byNum = new Map();
+    for (const l of lessons) {
+      if (l.date !== date) continue;
+      const b = valid[l.num - 1];
+      if (!b) continue;
+      if (!byNum.has(l.num)) byNum.set(l.num, { num: l.num, lessons: [], start: RS.toMin(b[0]), end: RS.toMin(b[1]) });
+      byNum.get(l.num).lessons.push(l);
+    }
+    return [...byNum.values()].sort((a, b) => a.start - b.start);
+  };
+
+  // now — минуты от полуночи (можно дробные). Возвращает
+  //   { kind: 'lesson', cur, next } — идёт урок cur;
+  //   { kind: 'break', prev, next, start, end } — перемена между уроками;
+  //   { kind: 'free', reason: 'before' | 'after' | 'none', next?, last? } — неурочное время.
+  RS.nowStatus = function (lessons, today, now, bells) {
+    const day = RS.daySchedule(lessons, today, bells);
+    if (!day.length) return { kind: 'free', reason: 'none' };
+    for (let i = 0; i < day.length; i++) {
+      const x = day[i];
+      if (now >= x.start && now < x.end) return { kind: 'lesson', cur: x, next: day[i + 1] || null };
+      if (now < x.start) {
+        return i === 0 ? { kind: 'free', reason: 'before', next: x }
+          : { kind: 'break', prev: day[i - 1], next: x, start: day[i - 1].end, end: x.start };
+      }
+    }
+    return { kind: 'free', reason: 'after', last: day[day.length - 1] };
   };
 })(globalThis.RS = globalThis.RS || {});

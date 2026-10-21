@@ -62,6 +62,7 @@ public class MainActivity extends Activity {
         setContentView(root);
 
         // Android 15 рисует приложение под статус-баром и панелью навигации — отодвигаем содержимое.
+        // Только здесь: страница env(safe-area-inset-*) не учитывает, иначе новые WebView дают двойной отступ.
         root.setOnApplyWindowInsetsListener((v, insets) -> {
             if (Build.VERSION.SDK_INT >= 30) {
                 Insets i = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.ime());

@@ -1,5 +1,5 @@
 // Тесты логики на jsdom: разбор недели (с ДЗ), загрузка дневника через выдуманный сайт, переходы между четвертями,
-// ДЗ на завтра, новые отметки с прошлого захода, статистика за год. Запуск: npm test
+// ДЗ на завтра, новые отметки с прошлого захода, звонки, статистика за год. Запуск: npm test
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -172,6 +172,31 @@ const pupil = { id: PID, origin: HOST, name: 'Тестов Тест' };
     const base = RS.snapshot(d.weeks, new Date('2026-10-20T08:00:00').getTime());
     await d.loadWeek('2026-09-21');
     eq(RS.newMarks(d.allLessons(), base, TODAY), []);
+  });
+
+  console.log('Звонки');
+
+  await test('урок, перемена и неурочное время по расписанию звонков', () => {
+    const w = makeWindow(createSite({ today: TODAY }));
+    const RS = w.RS;
+    const B = RS.DEFAULT_BELLS;
+    eq(B.slice(0, 2), [['08:00', '08:45'], ['09:00', '09:45']], 'по умолчанию 8:00–8:45, 9:00–9:45');
+    const l = (num, subject) => ({ date: TODAY, num, subject, marks: [], absent: false, hw: '' });
+    // 2-й урок у двух групп, 3-го нет
+    const day = [l(1, 'Матем.'), l(2, 'Англ. яз.'), l(2, 'Нем. яз.'), l(4, 'Физика'), { ...l(1, 'Химия'), date: '2026-10-21' }];
+    const st = (hm) => RS.nowStatus(day, TODAY, RS.toMin(hm), B);
+    eq(st('07:30').kind + '/' + st('07:30').reason + '/' + st('07:30').next.num, 'free/before/1');
+    eq([st('08:00').kind, st('08:00').cur.num, st('08:00').next.num], ['lesson', 1, 2]);
+    eq([st('08:50').kind, st('08:50').prev.num, st('08:50').next.num, st('08:50').end], ['break', 1, 2, 540]);
+    eq(st('09:10').cur.lessons.map((x) => x.subject), ['Англ. яз.', 'Нем. яз.'], 'группы — в одном уроке');
+    eq([st('10:20').kind, st('10:20').prev.num, st('10:20').next.num], ['break', 2, 4], 'окно вместо 3-го урока — перемена до 4-го');
+    eq(st('11:44').cur.num, 4);
+    eq([st('11:45').kind, st('11:45').reason, st('11:45').last.num], ['free', 'after', 4]);
+    eq(RS.nowStatus([], TODAY, 600, B), { kind: 'free', reason: 'none' });
+    // урок без звонка и испорченные звонки не ломают расчёт
+    const bad = [['08:00', '08:45'], ['', '09:45'], ['10:00', '09:00']];
+    eq(RS.daySchedule(day, TODAY, bad).map((x) => x.num), [1]);
+    eq(RS.daySchedule(day, TODAY, 'мусор').map((x) => x.num), [1, 2, 4], 'без настроек — по умолчанию');
   });
 
   console.log('Статистика');
