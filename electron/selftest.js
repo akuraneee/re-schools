@@ -81,6 +81,10 @@ module.exports = async function selftest({ ses, site, createWindow }) {
     await js(`document.querySelector('.tabs button[data-tab=stats]').click()`);
     check('статистика: обзор', await waitFor(`!RS.app.state.statsLoading && document.querySelectorAll('.scard').length > 10 && document.querySelectorAll('.kpi').length === 5`, 60000));
     check('статистика: все четверти', await js(`RS.app.state.stats.quarters.length === 4 && document.querySelector('.sc-qs').children.length === 4`));
+    check('статистика: предмет раз в неделю — по полугодиям', await js(`(() => {
+      const c = [...document.querySelectorAll('.scard[data-key]')].find((x) => x.querySelector('.sc-name').textContent === 'География');
+      return c && c.querySelectorAll('.sc-q').length === 2 && c.querySelector('.sc-ql').textContent === '1 полуг.';
+    })()`));
     await shot('stats-overview');
     await js(`document.querySelector('.scard[data-key]').click()`);
     check('статистика: предмет', await waitFor(`document.querySelector('.subj-pick') && document.querySelectorAll('.chart .dot').length > 3`));
@@ -114,6 +118,13 @@ module.exports = async function selftest({ ses, site, createWindow }) {
     await js(`document.querySelector('[data-act=bell-reset]').click()`);
     check('звонки: по умолчанию', await js(`RS.app.state.settings.bells.length === 8 && RS.app.state.settings.bells[0][0] === '08:00'`));
     await shot('settings');
+    check('четвертные отметки: по умолчанию', await js(`document.querySelector('select[name=period][data-key="география"] option:checked').textContent === 'авто: полугодие'`));
+    await js(`(() => { const s = document.querySelector('select[name=period][data-key="география"]'); s.value = 'q'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    check('четвертные отметки: география — за четверть', await js(`RS.app.state.stats.subjects.find((s) => s.key === 'география').terms.length === 4 && JSON.parse(localStorage.getItem('rs:1234567:periods')).география === 'q'`));
+    await js(`(() => { const s = document.querySelector('select[name=period][data-key="география"]'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    check('четвертные отметки: снова по умолчанию', await js(`RS.app.state.stats.subjects.find((s) => s.key === 'география').period === 'h' && !JSON.parse(localStorage.getItem('rs:1234567:periods')).география`));
+    await js(`document.querySelector('.period').scrollIntoView({ block: 'start' })`);
+    await shot('settings-periods');
     check('назад из настроек', await js(`RS.app.back() && RS.app.state.tab === 'home'`));
   } catch (e) {
     checks[`исключение: ${e.message}`] = false;

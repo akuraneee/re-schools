@@ -229,7 +229,7 @@ const pupil = { id: PID, origin: HOST, name: 'Тестов Тест' };
     eq(math.all.n, vals.length);
     eq(+math.all.avg.toFixed(6), +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(6));
     eq(math.current.rounded, RS.roundMark(math.current.avg));
-    eq(math.year.quarters, 1);
+    eq(math.year.terms, 1);
     eq(math.year.rounded, math.current.rounded, 'годовая по одной четверти = четвертная');
     eq(st.distribution.reduce((a, b) => a + b, 0), st.overall.marks);
     eq(st.overall.absences, data.lessons.filter((l) => l.absent && l.date <= TODAY).length);
@@ -242,6 +242,46 @@ const pupil = { id: PID, origin: HOST, name: 'Тестов Тест' };
     // графики рисуются
     ok(RS.charts.distribution(st.distribution).startsWith('<svg'));
     ok(RS.charts.line({ series: [{ points: st.weekly.map((x) => ({ date: x.week, y: x.avg })) }] }).includes('<path'));
+  });
+
+  await test('полугодовые отметки: по умолчанию у предметов раз в неделю, настройка переключает', async () => {
+    const site = createSite({ today: '2027-01-20' });
+    const w = makeWindow(site);
+    const RS = w.RS;
+    const data = await RS.crawl(pupil, { today: site.today, delay: 0 });
+    const per = RS.lessonsPerWeek(data);
+    ok(Math.abs(per['черчение'] - 1) < 0.15, `черчение ≈ 1 в неделю: ${per['черчение']}`);
+    ok(per['матем'] > 4, `математика ≈ 5 в неделю: ${per['матем']}`);
+    let st = RS.computeStats(data, { today: site.today });
+    eq(st.current, '94');
+    eq(st.halves.map((h) => h.qids), [['92', '93'], ['94', '95']]);
+    const geo = st.subjects.find((s) => s.name === 'География');
+    const math = st.subjects.find((s) => s.name === 'Математика');
+    eq([geo.period, geo.periodAuto, math.period], ['h', 'h', 'q']);
+    eq(geo.terms.map((t) => t.name), ['1 полугодие', '2 полугодие']);
+    eq(math.terms.length, 4);
+    const marks = (s, qs) => s.marks.filter((m) => qs.includes(m.q)).map((m) => m.v);
+    const h1 = marks(geo, ['92', '93']);
+    eq(geo.terms[0].sum.n, h1.length, 'первое полугодие — отметки обеих четвертей');
+    eq(geo.byQ['92'], geo.byQ['93'], 'одна отметка на две четверти');
+    eq(geo.currentTerm.id, 'h2');
+    eq(geo.current.n, marks(geo, ['94']).length);
+    eq(geo.year.of, 2);
+    eq(geo.year.exact, RS.mean(geo.terms.filter((t) => t.sum.n).map((t) => t.sum.rounded)), 'годовая — по полугодовым');
+    eq(math.year.of, 4);
+    const total = st.quarterTotals['92'];
+    eq(total.marks, data.lessons.filter((l) => l.q === '92').reduce((a, l) => a + l.marks.length, 0), 'отметки четверти не задвоены');
+    // скользящее среднее копится по полугодию
+    const r = geo.running.filter((x) => x.q === 'h1');
+    eq(+r[r.length - 1].avg.toFixed(6), +RS.mean(h1).toFixed(6));
+    // настройка: география — за четверть, математика — за полугодие
+    st = RS.computeStats(data, { today: site.today, periods: { 'география': 'q', 'матем': 'h' } });
+    const geo2 = st.subjects.find((s) => s.name === 'География');
+    const math2 = st.subjects.find((s) => s.name === 'Математика');
+    eq([geo2.period, geo2.periodAuto, math2.period, math2.periodAuto], ['q', 'h', 'h', 'q']);
+    eq(geo2.terms.length, 4);
+    eq(geo2.current.n, marks(geo, ['94']).length);
+    eq(math2.terms.length, 2);
   });
 
   await test('быстрое обновление — только текущая и будущие четверти; прошлые берутся из сохранённого', async () => {

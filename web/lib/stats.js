@@ -69,6 +69,42 @@
     return r;
   }
 
+  // Сколько уроков предмета в неделю: в среднем по учебным неделям (с уроками) от его первой до последней недели.
+  RS.lessonsPerWeek = function (data) {
+    const weeks = [...new Set(data.lessons.map((l) => RS.mondayOf(l.date)))].sort();
+    const by = new Map();
+    for (const l of data.lessons) {
+      const key = RS.subjectKey(l.subject);
+      const s = by.get(key) || { n: 0, first: l.date, last: l.date };
+      s.n++;
+      if (l.date < s.first) s.first = l.date;
+      if (l.date > s.last) s.last = l.date;
+      by.set(key, s);
+    }
+    const r = {};
+    for (const [key, s] of by) {
+      const a = RS.mondayOf(s.first), b = RS.mondayOf(s.last);
+      r[key] = s.n / weeks.filter((w) => w >= a && w <= b).length;
+    }
+    return r;
+  };
+
+  // Предметы, которые идут раз в неделю (и реже), по умолчанию оцениваются за полугодие.
+  RS.HALF_YEAR_BELOW = 1.5;
+  RS.defaultPeriod = (perWeek) => (perWeek < RS.HALF_YEAR_BELOW ? 'h' : 'q');
+
+  // Полугодия: 1–2 четверти и 3–4. Номер четверти — из названия («2 четверть»), иначе по порядку.
+  function halves(quarters) {
+    const res = [];
+    for (const q of quarters) {
+      const n = +(q.name.match(/\d/) || [])[0] || q.order + 1;
+      const i = n <= 2 ? 0 : 1;
+      if (!res[i]) res[i] = { id: `h${i + 1}`, name: `${i + 1} полугодие`, short: `${i + 1} полуг.`, qids: [] };
+      res[i].qids.push(q.id);
+    }
+    return res.filter(Boolean);
+  }
+
   RS.computeStats = function (data, opts = {}) {
     const thr = opts.threshold ?? 0.5;
     const today = opts.today || RS.today();
@@ -104,24 +140,40 @@
       }
     }
 
+    // Отметка за период: за четверть или (opts.periods[ключ] === 'h', по умолчанию — у предметов раз в неделю)
+    // за полугодие. Годовая — среднее округлённых отметок за периоды.
+    const perWeek = RS.lessonsPerWeek(data);
+    const quarterTerms = quarters.map((q) => ({ id: q.id, name: q.name, short: null, qids: [q.id] }));
+    const halfTerms = halves(quarters);
+    const periods = opts.periods || {};
+
     const subjects = [];
     const noMarks = [];
     for (const s of subjMap.values()) {
+      s.perWeek = perWeek[s.key];
+      s.periodAuto = RS.defaultPeriod(s.perWeek);
+      s.period = periods[s.key] === 'q' || periods[s.key] === 'h' ? periods[s.key] : s.periodAuto;
       if (!s.marks.length) { noMarks.push(s); continue; }
+      const terms = (s.period === 'h' ? halfTerms : quarterTerms).map((t) => ({
+        ...t, sum: summary(s.marks.filter((m) => t.qids.includes(m.q)).map((m) => m.v), thr),
+      }));
+      // byQ — отметка того периода, в который входит четверть (у полугодовых — одна на две четверти).
+      const termOf = {};
       const byQ = {};
-      for (const q of quarters) byQ[q.id] = summary(s.marks.filter((m) => m.q === q.id).map((m) => m.v), thr);
-      const done = quarters.map((q) => byQ[q.id]).filter((x) => x.n);
-      const qRounded = done.map((x) => x.rounded);
-      const yearExact = RS.mean(qRounded);
+      for (const t of terms) for (const id of t.qids) { termOf[id] = t; byQ[id] = t.sum; }
+      const done = terms.filter((t) => t.sum.n);
+      const yearExact = RS.mean(done.map((t) => t.sum.rounded));
       const all = summary(s.marks.map((m) => m.v), thr);
+      const cur = current ? termOf[current] : null;
 
-      // Скользящее среднее внутри каждой четверти — как «копится» четвертная отметка.
+      // Скользящее среднее внутри каждого периода — как «копится» четвертная (полугодовая) отметка.
       const running = [];
       const acc = {};
       for (const m of s.marks) {
-        const a = (acc[m.q] = acc[m.q] || { sum: 0, n: 0 });
+        const t = termOf[m.q]?.id ?? m.q;
+        const a = (acc[t] = acc[t] || { sum: 0, n: 0 });
         a.sum += m.v; a.n++;
-        running.push({ date: m.date, v: m.v, q: m.q, avg: a.sum / a.n });
+        running.push({ date: m.date, v: m.v, q: t, avg: a.sum / a.n });
       }
 
       const last5 = s.marks.slice(-5).map((m) => m.v);
@@ -136,11 +188,16 @@
         marks: s.marks,
         lessons: s.lessons,
         absences: s.absences,
+        perWeek: s.perWeek,
+        period: s.period,
+        periodAuto: s.periodAuto,
+        terms,
+        currentTerm: cur,
         byQ,
         all,
-        year: { quarters: qRounded.length, exact: yearExact, rounded: RS.roundMark(yearExact, thr) },
-        current: current ? byQ[current] : null,
-        forecast: current ? forecast(byQ[current], thr) : null,
+        year: { terms: done.length, of: s.period === 'h' ? 2 : Math.max(4, quarters.length), exact: yearExact, rounded: RS.roundMark(yearExact, thr) },
+        current: cur ? cur.sum : null,
+        forecast: cur ? forecast(cur.sum, thr) : null,
         trend: trendPerMonth(s.marks),
         last5: RS.mean(last5),
         prev5: prev5.length ? RS.mean(prev5) : null,
@@ -151,7 +208,7 @@
     }
     subjects.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 
-    // Итоги по четвертям: средний балл = среднее по предметам.
+    // Итоги по четвертям: средний балл = среднее по предметам (у полугодовых — их отметка за полугодие).
     const quarterTotals = {};
     for (const q of quarters) {
       const list = subjects.map((s) => s.byQ[q.id]).filter((x) => x.n);
@@ -159,7 +216,7 @@
         subjects: list.length,
         exact: RS.mean(list.map((x) => x.avg)),
         rounded: RS.mean(list.map((x) => x.rounded)),
-        marks: list.reduce((a, x) => a + x.n, 0),
+        marks: allMarks.filter((m) => m.q === q.id).length,
       };
     }
 
@@ -189,13 +246,14 @@
     const recent30 = allMarks.filter((m) => m.date > d30 && m.date <= today).map((m) => m.v);
     const before30 = allMarks.filter((m) => m.date > d60 && m.date <= d30).map((m) => m.v);
 
-    const withYear = subjects.filter((s) => s.year.quarters);
+    const withYear = subjects.filter((s) => s.year.terms);
     const withCurrent = subjects.filter((s) => s.current && s.current.n);
 
     return {
       threshold: thr,
       today,
       quarters,
+      halves: halfTerms,
       ranges,
       current,
       inProgress,

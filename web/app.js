@@ -34,6 +34,7 @@
     sort: { key: 'name', dir: 1 },
     statsData: null, // результат RS.crawl, хранится в <id>:stats
     stats: null, // RS.computeStats(statsData)
+    periods: {}, // предмет → 'q' (за четверть) | 'h' (за полугодие); нет — по умолчанию (RS.defaultPeriod), хранится в <id>:periods
     statsLoading: false,
     statsPages: 0,
   };
@@ -89,6 +90,7 @@
     S.visit = RS.startVisit(RS.store.get(`${p.id}:visit`));
     saveVisit();
     S.statsData = RS.store.get(`${p.id}:stats`);
+    S.periods = RS.store.get(`${p.id}:periods`, {});
     S.subject = null;
     recompute();
     S.week = RS.mondayOf(RS.today());
@@ -146,7 +148,7 @@
   }
 
   function recompute() {
-    S.stats = S.statsData ? RS.computeStats(S.statsData, { threshold: S.settings.threshold, today: RS.today() }) : null;
+    S.stats = S.statsData ? RS.computeStats(S.statsData, { threshold: S.settings.threshold, today: RS.today(), periods: S.periods }) : null;
   }
 
   function setStatsData(d) {
@@ -474,7 +476,11 @@
   const bands = (st) => st.quarters.filter((q) => st.ranges[q.id])
     .map((q) => ({ start: st.ranges[q.id].start, end: st.ranges[q.id].end, label: qShort(q) }));
 
-  const quartersOf = (st) => Math.max(4, st.quarters.length);
+  // Период отметки предмета: четверть или полугодие (у предметов раз в неделю).
+  const tShort = (t) => t.short || qShort(t);
+  const isHalf = (s) => s.period === 'h';
+  const periodGen = (s) => (isHalf(s) ? 'полугодия' : 'четверти');
+  const periodPrep = (s) => (isHalf(s) ? 'в этом полугодии' : 'в этой четверти');
 
   const statsProgressText = () => `Загружаю дневник за учебный год…${S.statsPages ? ` страниц: ${S.statsPages}` : ''}`;
 
@@ -510,7 +516,8 @@
 
     h += '<h2 class="sec">Предметы</h2>';
     h += subjectCards(st, sortSubjects(st));
-    h += '<p class="note">Крупная цифра — округлённая отметка, мелкая — точное среднее. Годовая считается как среднее округлённых четвертных. ' +
+    h += '<p class="note">Крупная цифра — округлённая отметка, мелкая — точное среднее. Годовая считается как среднее округлённых четвертных ' +
+      '(у предметов раз в неделю — полугодовых; выбирается в настройках). ' +
       `Порог округления: ${fmt(st.threshold)} (меняется в настройках).</p>`;
     if (st.noMarks.length) h += `<p class="note">Без отметок: ${st.noMarks.map((s) => esc(s.name)).join(', ')}.</p>`;
 
@@ -539,9 +546,9 @@
     return h;
   }
 
-  const yearCell = (st, s) => (s.year.quarters
+  const yearCell = (s) => (s.year.terms
     ? `<span class="qv">${mark(s.year.rounded)}<span class="ex">${fmt(s.year.exact)}</span></span>` +
-      (s.year.quarters < quartersOf(st) ? `<span class="tag">${s.year.quarters}/${quartersOf(st)}</span>` : '')
+      (s.year.terms < s.year.of ? `<span class="tag">${s.year.terms}/${s.year.of}</span>` : '')
     : '<span class="muted">—</span>');
 
   function subjectCards(st, subs) {
@@ -550,9 +557,10 @@
     h += '<div class="scards">';
     for (const s of subs) {
       h += `<div class="scard" data-act="subject" data-key="${esc(s.key)}">` +
-        `<div class="sc-top"><span class="sc-name">${esc(s.name)}</span><span class="sc-year"><span class="muted small">год</span> ${yearCell(st, s)}</span></div>` +
-        '<div class="sc-qs">' + st.quarters.map((q) =>
-          `<div class="sc-q${q.id === st.current ? ' cur' : ''}"><span class="sc-ql">${esc(qShort(q))}</span>${qv(s.byQ[q.id])}</div>`).join('') + '</div>' +
+        `<div class="sc-top"><span class="sc-name">${esc(s.name)}</span><span class="sc-year"><span class="muted small">год</span> ${yearCell(s)}</span></div>` +
+        '<div class="sc-qs">' + s.terms.map((t) =>
+          `<div class="sc-q${t.qids.includes(st.current) ? ' cur' : ''}"${t.qids.length > 1 ? ` style="grid-column: span ${t.qids.length}"` : ''}>` +
+          `<span class="sc-ql">${esc(tShort(t))}</span>${qv(t.sum)}</div>`).join('') + '</div>' +
         `<div class="sc-foot"><span>${s.all.n} отм. · ср. ${fmt(s.all.avg)}${s.absences ? ` · пропуски ${s.absences}` : ''}</span>${trend(s.trend)}${RS.charts.sparkline(s.running.slice(-15).map((r) => r.avg))}</div>` +
         '</div>';
     }
@@ -590,7 +598,7 @@
   function subjectView(st) {
     const s = st.subjects.find((x) => x.key === S.subject) || st.subjects[0];
     S.subject = s.key;
-    const curQ = st.quarters.find((q) => q.id === st.current);
+    const curT = s.currentTerm;
     const c = s.current;
 
     let h = '<select class="input subj-pick" data-act="pick-subject">' +
@@ -598,9 +606,10 @@
       '</select>';
 
     h += '<div class="kpis">';
-    if (c && c.n) h += kpi(esc(curQ ? qShort(curQ) : 'Четверть'), mark(c.rounded), `${c.n} отметок`, fmt(c.avg, 3));
-    else h += kpi(esc(curQ ? qShort(curQ) : 'Четверть'), '—', 'отметок пока нет');
-    h += kpi('Годовая', s.year.quarters ? mark(s.year.rounded) : '—', `по ${s.year.quarters} из ${quartersOf(st)} четв.`, fmt(s.year.exact, 3));
+    const curLabel = esc(curT ? tShort(curT) : isHalf(s) ? 'Полугодие' : 'Четверть');
+    if (c && c.n) h += kpi(curLabel, mark(c.rounded), `${c.n} отметок`, fmt(c.avg, 3));
+    else h += kpi(curLabel, '—', 'отметок пока нет');
+    h += kpi('Годовая', s.year.terms ? mark(s.year.rounded) : '—', `по ${s.year.terms} из ${s.year.of} ${isHalf(s) ? 'полуг.' : 'четв.'}`, fmt(s.year.exact, 3));
     h += kpi('За год (все отметки)', fmt(s.all.avg), `${s.all.n} отметок`);
     h += kpi('Медиана · мода', `${fmt(s.all.median, 1)} · ${s.all.mode}`, `мин ${s.all.min}, макс ${s.all.max}`);
     h += kpi('Разброс', fmt(s.all.std), 'стандартное отклонение');
@@ -608,10 +617,10 @@
     h += kpi('Пропуски', String(s.absences), `из ${s.lessons} уроков`);
     h += '</div>';
 
-    // Прогноз на четверть
+    // Прогноз на четверть (полугодие)
     const f = s.forecast;
-    h += '<section class="card"><div class="card-h"><h2>Что нужно в этой четверти</h2></div>';
-    if (!f) h += '<div class="empty">Отметок в текущей четверти пока нет</div>';
+    h += `<section class="card"><div class="card-h"><h2>Что нужно ${periodPrep(s)}</h2></div>`;
+    if (!f) h += `<div class="empty">Отметок ${periodPrep(s)} пока нет</div>`;
     else {
       if (f.target && f.up.length) {
         h += `<p>Чтобы получить ${mark(f.target)}: ` + f.up.map((u) => `<b>${u.count}</b>×${u.mark}`).join(' или ') + '</p>';
@@ -626,9 +635,9 @@
     h += '<section class="card"><div class="card-h"><h2>А что если…</h2></div><div class="whatif">' +
       '<input class="input" data-act="whatif" inputmode="numeric" placeholder="добавить отметки, напр. 9 10 8">' +
       '<span class="whatif-out muted">введите отметки</span></div>' +
-      '<p class="note">Считается для текущей четверти.</p></section>';
+      `<p class="note">Считается для текущего ${periodGen(s)}.</p></section>`;
 
-    // График: отметки + накопленное среднее внутри четверти
+    // График: отметки + накопленное среднее внутри четверти (полугодия)
     let prevQ = null;
     const avgPts = s.running.map((r) => {
       const p = { date: r.date, y: r.avg, break: r.q !== prevQ };
@@ -643,14 +652,17 @@
         { points: avgPts, cls: '', step: false },
       ],
     });
-    h += '<div class="legend"><span><i class="dot"></i>отметка</span><span><i></i>среднее в четверти на эту дату</span></div></section>';
+    h += `<div class="legend"><span><i class="dot"></i>отметка</span><span><i></i>среднее ${isHalf(s) ? 'в полугодии' : 'в четверти'} на эту дату</span></div></section>`;
 
-    // По четвертям
-    h += '<section class="card"><div class="card-h"><h2>Отметки по четвертям</h2></div>';
-    for (const q of st.quarters) {
-      const ms = s.marks.filter((m) => m.q === q.id);
-      const sq = s.byQ[q.id];
-      h += `<div class="qblock"><div class="qt">${esc(q.name)} ${sq.n ? `${mark(sq.rounded)} <span class="muted">${fmt(sq.avg, 3)} · ${sq.n} отм. · мин ${sq.min}, макс ${sq.max}</span>` : '<span class="muted">нет отметок</span>'}</div>`;
+    // По четвертям (полугодиям)
+    h += `<section class="card"><div class="card-h"><h2>Отметки по ${isHalf(s) ? 'полугодиям' : 'четвертям'}</h2></div>`;
+    if (isHalf(s)) {
+      h += `<p class="note">${s.period === s.periodAuto ? 'Урок раз в неделю — отметка' : 'Отметка'} выставляется за полугодие. Меняется в настройках.</p>`;
+    }
+    for (const t of s.terms) {
+      const ms = s.marks.filter((m) => t.qids.includes(m.q));
+      const sq = t.sum;
+      h += `<div class="qblock"><div class="qt">${esc(t.name)} ${sq.n ? `${mark(sq.rounded)} <span class="muted">${fmt(sq.avg, 3)} · ${sq.n} отм. · мин ${sq.min}, макс ${sq.max}</span>` : '<span class="muted">нет отметок</span>'}</div>`;
       if (ms.length) h += '<div class="chips">' + ms.map((m) => mark(m.v, RS.fmtDate(m.date))).join('') + '</div>';
       h += '</div>';
     }
@@ -757,12 +769,39 @@
         ${statsInfo}
         <div class="actions" style="margin-top:12px"><button class="btn ghost block" data-act="stats-full"${S.statsLoading ? ' disabled' : ''}>Загрузить статистику заново</button></div>
       </section>
+      ${periodsCard()}
       <section class="card"><div class="actions">
         <button class="btn ghost block" data-act="site">Открыть сайт schools.by</button>
         <button class="btn ghost block" data-act="login">Войти в другой аккаунт</button>
         <button class="btn ghost block" data-act="clear">Удалить сохранённый дневник</button>
       </div></section>
       <p class="note" style="text-align:center">re:schools · данные хранятся только на этом устройстве</p>`;
+  }
+
+  function perWeekText(v) {
+    if (v == null) return '';
+    const n = Math.round(v * 10) / 10;
+    return Number.isInteger(n) ? `${n} ${RS.plural(n, 'урок', 'урока', 'уроков')} в неделю` : `${fmt(n, 1)} урока в неделю`;
+  }
+
+  // За какой период выставляется отметка по каждому предмету.
+  function periodsCard() {
+    const st = S.stats;
+    const head = '<div class="card-h"><h2>Четвертные отметки</h2></div>' +
+      '<div class="meta" style="margin-bottom:4px">За четверть или за полугодие. По умолчанию предметы, которые идут раз в неделю, ' +
+      'оцениваются за полугодие. По этим отметкам считаются годовые в статистике.</div>';
+    if (!st) return `<section class="card">${head}<div class="empty">Предметы появятся после загрузки статистики.</div></section>`;
+    const list = [...st.subjects, ...st.noMarks].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    const name = { q: 'четверть', h: 'полугодие' };
+    const rows = list.map((s) => {
+      const own = S.periods[s.key];
+      const opt = (v, t) => `<option value="${v}"${(own || '') === v ? ' selected' : ''}>${t}</option>`;
+      return `<div class="period"><div><div>${esc(s.name)}</div>` +
+        `<div class="meta">${perWeekText(s.perWeek)}</div></div>` +
+        `<select class="input" name="period" data-key="${esc(s.key)}">` +
+        opt('', `авто: ${name[s.periodAuto]}`) + opt('q', name.q) + opt('h', name.h) + '</select></div>';
+    }).join('');
+    return `<section class="card">${head}${rows}</section>`;
   }
 
   // ---------- действия ----------
@@ -828,6 +867,13 @@
       bells[+e.target.dataset.i][+e.target.dataset.k] = e.target.value;
       S.settings.bells = bells;
       RS.store.set('settings', S.settings);
+    } else if (e.target.name === 'period') {
+      const periods = { ...S.periods };
+      if (e.target.value) periods[e.target.dataset.key] = e.target.value;
+      else delete periods[e.target.dataset.key];
+      S.periods = periods;
+      RS.store.set(`${S.pupil.id}:periods`, periods);
+      recompute();
     } else if (e.target.name === 'hw') {
       S.settings.hwMode = e.target.value;
       RS.store.set('settings', S.settings);
