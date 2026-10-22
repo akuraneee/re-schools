@@ -47,8 +47,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Платформа Android SDK 37
         run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" "build-tools;36.0.0" > /dev/null
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" --list | grep -E "platforms;android-3[5-9]" || true
+          # платформа 37 называется то android-37, то android-37.0 — пробуем оба варианта
+          "$SDKM" "platforms;android-37" "build-tools;36.0.0" || "$SDKM" "platforms;android-37.0" "build-tools;36.0.0"
       - name: Ключ подписи (если добавлен в секреты)
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
