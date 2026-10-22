@@ -48,7 +48,6 @@ import io.github.akuraneee.reschools.R
 import io.github.akuraneee.reschools.UiState
 import io.github.akuraneee.reschools.ui.diary.DiaryScreen
 import io.github.akuraneee.reschools.ui.home.HomeScreen
-import io.github.akuraneee.reschools.ui.schedule.ScheduleScreen
 import io.github.akuraneee.reschools.ui.settings.SettingsScreen
 import io.github.akuraneee.reschools.ui.stats.StatsScreen
 import io.github.akuraneee.reschools.ui.web.WebScreen
@@ -61,7 +60,7 @@ private object Route {
     const val SITE = "site"
 }
 
-private enum class Tab { Home, Diary, Schedule, Stats }
+private enum class Tab { Home, Diary, Stats }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -106,6 +105,7 @@ fun AppRoot(viewModel: AppViewModel = viewModel()) {
                     onBack = { nav.popBackStack() },
                     onSelectPupil = viewModel::selectPupil,
                     onHomeworkMode = viewModel::setHomeworkMode,
+                    onThreshold = viewModel::setThreshold,
                     onOpenSite = { nav.navigate(Route.SITE) },
                     onOtherAccount = {
                         viewModel.forgetSiteLogin()
@@ -137,7 +137,7 @@ fun AppRoot(viewModel: AppViewModel = viewModel()) {
     }
 }
 
-/** «Главная», «Дневник», «Расписание» и «Статистика» под адаптивной навигацией: нижняя панель на телефоне, боковая — на планшете. */
+/** «Главная», «Дневник» и «Статистика» под адаптивной навигацией: нижняя панель на телефоне, боковая — на планшете. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class) // ShortNavigationBar / WideNavigationRail в NavigationSuiteScaffold — экспериментальные в 1.5.0-beta
 @Composable
 internal fun MainScreen(
@@ -178,7 +178,6 @@ internal fun MainScreen(
                 val (label, icon, iconFilled) = when (entry) {
                     Tab.Home -> Triple(R.string.nav_home, R.drawable.ic_home_24, R.drawable.ic_home_fill_24)
                     Tab.Diary -> Triple(R.string.nav_diary, R.drawable.ic_menu_book_24, R.drawable.ic_menu_book_fill_24)
-                    Tab.Schedule -> Triple(R.string.nav_schedule, R.drawable.ic_today_24, R.drawable.ic_today_24)
                     Tab.Stats -> Triple(R.string.nav_stats, R.drawable.ic_bar_chart_24, R.drawable.ic_bar_chart_24)
                 }
                 item(
@@ -200,12 +199,6 @@ internal fun MainScreen(
                 onLogin = onLogin,
             )
             Tab.Diary -> DiaryScreen(
-                state = state,
-                contentInsets = contentInsets,
-                onOpenWeek = onOpenWeek,
-                onLogin = onLogin,
-            )
-            Tab.Schedule -> ScheduleScreen(
                 state = state,
                 contentInsets = contentInsets,
                 onOpenWeek = onOpenWeek,

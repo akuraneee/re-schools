@@ -29,6 +29,8 @@ data class UiState(
     val today: LocalDate = LocalDate.now(),
     val weeks: Map<LocalDate, Week> = emptyMap(),
     val lessons: List<Lesson> = emptyList(),
+    /** понедельник → qid четверти (по нему уроки делятся на четверти в статистике) */
+    val links: Map<LocalDate, String> = emptyMap(),
     /** null — сравнивать не с чем (первый заход). */
     val newMarks: List<NewMark>? = null,
     val baseline: Snapshot? = null,

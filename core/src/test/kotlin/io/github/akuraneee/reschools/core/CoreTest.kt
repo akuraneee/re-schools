@@ -263,24 +263,32 @@ class StatsTest {
     }
 
     @Test
-    fun `средние, распределение и динамика`() {
+    fun `четверти, средние, прогноз и динамика`() {
         val l = { day: String, subj: String, marks: List<Int> -> Lesson(d(day), 1, subj, marks) }
+        val q = { monday: LocalDate -> if (monday < d("2026-10-05")) "91" else "92" }
         val lessons = listOf(
-            l("2026-08-01", "Матем.", listOf(5)),
-            l("2026-10-01", "Матем.", listOf(6, 7, 8, 9, 9)),
-            l("2026-10-10", "Матем.", listOf(10)),
+            l("2026-09-14", "Матем.", listOf(5)),
+            l("2026-10-05", "Матем.", listOf(6, 7, 8, 9, 9)),
+            l("2026-10-12", "Матем.", listOf(10)),
             l("2026-10-12", "Физика", listOf(4)),
-            l("2026-10-30", "Физика", listOf(10)), // будущее
         ) + Lesson(d("2026-10-13"), 2, "Физика", absent = true)
-        val s = computeStats(lessons, TODAY)
-        assertEquals(8, s.marks)
-        assertEquals(1, s.absences)
-        assertEquals(2, s.distribution[9])
+        val s = computeStats(lessons, q, TODAY)
+        assertEquals(listOf("91", "92"), s.quarters.map { it.id })
+        assertEquals("92", s.current)
         val math = s.subjects.first { it.name == "Математика" }
-        assertEquals(7, math.count)
-        assertEquals(8, math.rounded, "среднее 7,71 округляется до 8")
-        assertEquals(8.6 - 5.5, math.trend!!, 1e-9, "последние 5 отметок против двух предыдущих")
-        assertEquals(4, s.subjects.first { it.name == "Физика" }.marks.single())
+        assertEquals(5.0, math.byQ.getValue("91")!!.avg)
+        assertEquals(49.0 / 6, math.byQ.getValue("92")!!.avg, 1e-9)
+        assertEquals(7, math.all.n)
+        // годовая — среднее округлённых четвертных: (5 + 8) / 2 = 6,5 → 7
+        assertEquals(6.5, math.year.exact)
+        assertEquals(7, math.year.rounded)
+        // 8,17 в 92-й: до 9 нужно ceil((8,5*6 - 49) / (10 - 8,5)) = 2 десятки
+        assertEquals(UpStep(10, 2), math.forecast!!.up.first())
         assertEquals(1, s.subjects.first { it.name == "Физика" }.absences)
+        assertEquals(1, s.distribution[4])
+        assertEquals(2, s.distribution[9])
+        assertEquals(roundMark(7.49), 7)
+        assertEquals(roundMark(7.5), 8)
+        assertEquals(roundMark(7.3, 0.3), 8)
     }
 }

@@ -58,6 +58,12 @@ object Ru {
     /** «20 октября» */
     fun dateLong(d: LocalDate) = "${d.dayOfMonth} ${MONTHS_GEN[d.monthValue - 1]}"
 
+    /** «20 окт» */
+    fun dayMonth(d: LocalDate) = "${d.dayOfMonth} ${MONTHS_SHORT[d.monthValue - 1]}"
+
+    /** «окт» по номеру месяца 1–12 */
+    fun monthShort(month: Int) = MONTHS_SHORT[month - 1]
+
     /** «вт, 20 окт» */
     fun dateShort(d: LocalDate) = "${WEEKDAYS_SHORT[d.dayOfWeek.ordinal]}, ${d.dayOfMonth} ${MONTHS_SHORT[d.monthValue - 1]}"
 

@@ -1,7 +1,7 @@
 # re:schools — заметки для Claude
 
 Android-приложение к дневнику schools.by: «Главная» (новые отметки с прошлого захода, отметки за сегодня, ДЗ на завтра)
-«Дневник» (по неделям), «Расписание» (уроки недели из дневника) и «Статистика» (`core/…/Stats.kt`; недели года подгружает `Diary.loadHistory`). Kotlin + Jetpack Compose, Material 3 Expressive. Устройство и команды — в README.md.
+«Дневник» (по неделям) и «Статистика» (`core/…/Stats.kt` — порт `../schools++/src/stats.js`; четверть недели берётся из `Diary.links`, недели года подгружает `Diary.loadHistory`). Kotlin + Jetpack Compose, Material 3 Expressive. Устройство и команды — в README.md.
 Пользователь общается по-русски; интерфейс, комментарии и README — на русском.
 
 - Разбор сайта взят из `../schools++` (`src/utils.js`, `src/parser.js`) и портирован на Kotlin (`core/…/Parser.kt`, Jsoup).

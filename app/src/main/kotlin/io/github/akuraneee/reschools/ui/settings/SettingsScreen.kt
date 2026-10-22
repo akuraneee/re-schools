@@ -16,6 +16,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,7 +24,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import io.github.akuraneee.reschools.R
 import io.github.akuraneee.reschools.UiState
 import io.github.akuraneee.reschools.core.HwMode
+import io.github.akuraneee.reschools.core.formatMean
 import io.github.akuraneee.reschools.ui.components.ContentMaxWidth
 import io.github.akuraneee.reschools.ui.components.SectionHeader
 import io.github.akuraneee.reschools.ui.components.SegmentedList
@@ -53,6 +57,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onSelectPupil: (String) -> Unit,
     onHomeworkMode: (HwMode) -> Unit,
+    onThreshold: (Double) -> Unit,
     onOpenSite: () -> Unit,
     onOtherAccount: () -> Unit,
     onClearData: () -> Unit,
@@ -111,6 +116,30 @@ fun SettingsScreen(
                                 leadingContent = { RadioButton(selected = selected, onClick = null) },
                                 supportingContent = { Text(stringResource(hint)) },
                             ) { Text(stringResource(title)) }
+                        }
+                    }
+                }
+                item(key = "threshold") {
+                    Section(stringResource(R.string.settings_stats)) {
+                        // Порог округления средней: 0,5 — 7,50 → 8, 7,49 → 7
+                        var value by remember(state.settings.threshold) { mutableFloatStateOf(state.settings.threshold.toFloat()) }
+                        Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                stringResource(R.string.settings_threshold, formatMean(value.toDouble())),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Slider(
+                                value = value,
+                                onValueChange = { value = (Math.round(it * 20) / 20f) },
+                                onValueChangeFinished = { onThreshold(value.toDouble()) },
+                                valueRange = 0.05f..0.95f,
+                                steps = 17,
+                            )
+                            Text(
+                                stringResource(R.string.settings_threshold_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 }

@@ -16,7 +16,6 @@ import io.github.akuraneee.reschools.core.TEST_PUPIL
 import androidx.compose.foundation.layout.WindowInsets
 import io.github.akuraneee.reschools.ui.MainScreen
 import io.github.akuraneee.reschools.ui.diary.DiaryScreen
-import io.github.akuraneee.reschools.ui.schedule.ScheduleScreen
 import io.github.akuraneee.reschools.ui.settings.SettingsScreen
 import io.github.akuraneee.reschools.ui.stats.StatsScreen
 import io.github.akuraneee.reschools.ui.theme.ReSchoolsTheme
@@ -67,6 +66,7 @@ class ScreenshotTest {
             today = today,
             weeks = session.diary.weeks,
             lessons = session.diary.allLessons(),
+            links = session.diary.links,
             newMarks = session.newMarks(),
             baseline = session.visit.baseline,
             lastSync = session.lastSync,
@@ -102,15 +102,12 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "w411dp-h891dp-night-xxhdpi")
     fun statsDark() = shot("stats-dark", dark = true) { StatsScreen(state(), WindowInsets(0), {}, {}, {}) }
 
-    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
-    fun scheduleLight() = shot("schedule-light") { ScheduleScreen(state(), WindowInsets(0), { _, _ -> }, {}) }
-
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi", fontScale = 2f)
     fun homeBigFont() = shot("home-font200") { MainScreen(state(), {}, { _, _ -> }, {}, {}, {}) }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun settings() = shot("settings") {
-        SettingsScreen(state(pupils = listOf(TEST_PUPIL, Pupil("7654321", TEST_PUPIL.origin, "Тестова Анна"))), "0.2.0", {}, {}, {}, {}, {}, {})
+        SettingsScreen(state(pupils = listOf(TEST_PUPIL, Pupil("7654321", TEST_PUPIL.origin, "Тестова Анна"))), "0.2.0", {}, {}, {}, {}, {}, {}, {})
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")

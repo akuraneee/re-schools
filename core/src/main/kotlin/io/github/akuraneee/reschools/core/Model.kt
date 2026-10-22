@@ -47,7 +47,7 @@ data class Visit(val baseline: Snapshot? = null, val seen: Snapshot? = null, val
 enum class HwMode { Assigned, Due }
 
 @Serializable
-data class Settings(val hwMode: HwMode = HwMode.Assigned)
+data class Settings(val hwMode: HwMode = HwMode.Assigned, val threshold: Double = 0.5)
 
 /** Новая или исправленная отметка; [was] — что стояло раньше. */
 data class NewMark(val lesson: Lesson, val was: String?)

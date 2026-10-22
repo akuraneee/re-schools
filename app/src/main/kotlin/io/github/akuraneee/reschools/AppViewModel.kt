@@ -66,6 +66,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     today = s?.today() ?: LocalDate.now(),
                     weeks = s?.diary?.weeks.orEmpty(),
                     lessons = s?.diary?.allLessons().orEmpty(),
+                    links = s?.diary?.links.orEmpty(),
                     newMarks = s?.newMarks(),
                     baseline = s?.visit?.baseline,
                     lastSync = s?.lastSync,
@@ -155,6 +156,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setHomeworkMode(mode: HwMode) {
         profile.setSettings(profile.settings.copy(hwMode = mode))
+        publish()
+    }
+
+    fun setThreshold(value: Double) {
+        profile.setSettings(profile.settings.copy(threshold = value))
         publish()
     }
 
