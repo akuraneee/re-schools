@@ -45,6 +45,8 @@ fun LazyListScope.overviewItems(st: Stats, sortKey: String, onSort: (String) -> 
     item(key = "kpis") {
         val o = st.overall
         val cur = st.currentQuarter
+        val recent = o.recent30
+        val before = o.before30
         val pct = if (o.lessons > 0) o.absences * 100.0 / o.lessons else 0.0
         KpiGrid(
             listOf(
@@ -62,7 +64,7 @@ fun LazyListScope.overviewItems(st: Stats, sortKey: String, onSort: (String) -> 
                 KpiData(stringResource(R.string.stats_kpi_all), formatMean(o.avgAll), stringResource(R.string.stats_kpi_all_sub, o.marks)),
                 KpiData(
                     stringResource(R.string.stats_kpi_30), formatMean(o.recent30),
-                    if (o.recent30 != null && o.before30 != null) stringResource(R.string.stats_kpi_30_sub, signed(o.recent30 - o.before30))
+                    if (recent != null && before != null) stringResource(R.string.stats_kpi_30_sub, signed(recent - before))
                     else stringResource(R.string.stats_kpi_30_count, o.recent30n),
                 ),
                 KpiData(
@@ -110,8 +112,9 @@ private fun SubjectCard(st: Stats, s: SubjectStats, onClick: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(s.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                 Text(stringResource(R.string.stats_year), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (s.year.rounded != null) {
-                    MarkBadge(s.year.rounded)
+                val yearRounded = s.year.rounded
+                if (yearRounded != null) {
+                    MarkBadge(yearRounded)
                     Text(formatMean(s.year.exact), style = MaterialTheme.typography.labelMedium)
                 } else {
                     Text("—")

@@ -89,9 +89,10 @@ fun LazyListScope.subjectItems(
             if (f == null || c == null) {
                 Text(stringResource(R.string.stats_need_none), color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                if (f.target != null && f.up.isNotEmpty()) {
-                    Text(stringResource(R.string.stats_need_up, f.target, f.up.joinToString(" / ") { "${it.count}×${it.mark}" }))
-                } else if (f.target == null) {
+                val target = f.target
+                if (target != null && f.up.isNotEmpty()) {
+                    Text(stringResource(R.string.stats_need_up, target, f.up.joinToString(" / ") { "${it.count}×${it.mark}" }))
+                } else if (target == null) {
                     Text(stringResource(R.string.stats_need_max))
                 }
                 f.down?.let { d ->

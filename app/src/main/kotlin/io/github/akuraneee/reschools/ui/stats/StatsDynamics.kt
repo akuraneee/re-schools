@@ -68,7 +68,9 @@ fun LazyListScope.dynamicsItems(st: Stats, onOpenSubject: (String) -> Unit) {
                 Cell(stringResource(R.string.stats_col_change), 1f, header = true, end = true)
             }
             val rows = st.subjects.map { s ->
-                s to (if (s.recent30 != null && s.before30 != null) s.recent30 - s.before30 else null)
+                val recent = s.recent30
+                val before = s.before30
+                s to (if (recent != null && before != null) recent - before else null)
             }.sortedByDescending { it.second ?: -99.0 }
             rows.forEach { (s, d) ->
                 TableRow(onClick = { onOpenSubject(s.key) }) {
