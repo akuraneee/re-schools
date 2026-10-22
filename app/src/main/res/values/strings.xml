@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">re:schools</string>
+
+    <!-- Навигация и общие действия -->
+    <string name="nav_home">Главная</string>
+    <string name="nav_diary">Дневник</string>
+    <string name="nav_schedule">Расписание</string>
+    <string name="nav_stats">Статистика</string>
+    <string name="settings_title">Настройки</string>
+    <string name="action_refresh">Обновить</string>
+    <string name="action_settings">Настройки</string>
+    <string name="action_back">Назад</string>
+    <string name="action_retry">Повторить</string>
+    <string name="action_sign_in">Войти</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_delete">Удалить</string>
+
+    <!-- Вход -->
+    <string name="welcome_title">re:schools</string>
+    <string name="welcome_text">Дневник schools.by в удобном виде: отметки за сегодня, ДЗ на завтра и новые отметки с прошлого раза.</string>
+    <string name="welcome_button">Войти через schools.by</string>
+    <string name="welcome_note">Вход — на самом сайте schools.by. Приложение не видит пароль и никуда не отправляет ваши данные.</string>
+    <string name="web_login_title">Вход в schools.by</string>
+    <string name="web_site_title">Сайт schools.by</string>
+    <string name="no_pupil_found">Не нашёл ученика на странице после входа.</string>
+
+    <!-- Состояние загрузки -->
+    <string name="error_auth">Вход на schools.by истёк.</string>
+    <string name="error_offline">Нет связи с schools.by — показаны сохранённые данные.</string>
+    <string name="error_other">Не удалось загрузить дневник: %1$s</string>
+    <string name="progress_refresh">Обновляю дневник… %1$d из %2$d</string>
+    <string name="loading_diary">Загружаю дневник…</string>
+    <string name="not_loaded">Дневник ещё не загружен.</string>
+
+    <!-- Главная -->
+    <string name="home_new_marks">Новые отметки</string>
+    <string name="home_new_since">с прошлого захода, %1$s</string>
+    <string name="home_new_first">Здесь появятся отметки, которые выставят после этого захода (кроме сегодняшних — они ниже).</string>
+    <string name="home_new_none">С прошлого захода (%1$s) новых отметок нет.</string>
+    <string name="home_new_count_cd">Новых отметок: %1$d</string>
+    <string name="home_today">Сегодня</string>
+    <string name="home_today_no_marks">Отметок пока нет.</string>
+    <string name="home_today_no_lessons">Сегодня уроков нет.</string>
+    <string name="home_today_weekend">Сегодня выходной.</string>
+    <string name="home_homework">ДЗ %1$s</string>
+    <string name="home_homework_no_schedule">Расписания на %1$s в дневнике пока нет.</string>
+    <string name="home_homework_none">не задано</string>
+    <string name="home_homework_from">задано %1$s</string>
+    <string name="home_updated">Обновлено %1$s</string>
+    <string name="mark_corrected">исправлена, было %1$s</string>
+    <string name="lesson_number">%1$s урок</string>
+    <string name="mark_cd">Отметка %1$d</string>
+    <string name="mark_absent_cd">Не был на уроке</string>
+    <string name="mark_absent">н</string>
+
+    <!-- Дневник -->
+    <string name="diary_prev_week">Предыдущая неделя</string>
+    <string name="diary_next_week">Следующая неделя</string>
+    <string name="diary_to_today">Сегодня</string>
+    <string name="diary_this_week">эта неделя</string>
+    <string name="diary_next_week_label">следующая неделя</string>
+    <string name="diary_prev_week_label">прошлая неделя</string>
+    <string name="diary_no_data">Нет данных за эту неделю.</string>
+    <string name="diary_vacation">Этой недели нет в дневнике — похоже, каникулы.</string>
+    <string name="diary_no_lessons_week">На этой неделе уроков нет.</string>
+    <string name="diary_no_lessons_day">Уроков нет.</string>
+    <string name="diary_average">ср. %1$s</string>
+    <string name="diary_today_label">сегодня</string>
+
+    <!-- Расписание -->
+    <string name="schedule_title">Расписание</string>
+    <string name="schedule_empty">Уроков в дневнике на эту неделю пока нет.</string>
+    <string name="schedule_note">Расписание берётся из дневника: время звонков и кабинеты там не указаны.</string>
+
+    <!-- Статистика -->
+    <string name="stats_title">Статистика</string>
+    <string name="stats_period_all">Весь год</string>
+    <string name="stats_period_30">30 дней</string>
+    <string name="stats_period_7">7 дней</string>
+    <string name="stats_average">Средний балл</string>
+    <string name="stats_marks_count">Отметок: %1$d</string>
+    <string name="stats_absences">Пропусков: %1$d</string>
+    <string name="stats_recent">За 30 дней: %1$s</string>
+    <string name="stats_recent_delta">За 30 дней: %1$s (%2$s к прошлым 30)</string>
+    <string name="stats_distribution">Какие отметки</string>
+    <string name="stats_subjects">По предметам</string>
+    <string name="stats_subject_info">отметок: %1$d · пропусков: %2$d</string>
+    <string name="stats_subject_cd">%1$s: средний балл %2$s, отметок %3$d</string>
+    <string name="stats_none">За этот период отметок нет.</string>
+    <string name="stats_loading">Загружаю недели учебного года… %1$d из %2$d</string>
+    <string name="stats_trend_up">растёт</string>
+    <string name="stats_trend_down">падает</string>
+
+    <!-- Настройки -->
+    <string name="settings_pupil">Ученик</string>
+    <string name="settings_homework">Где schools.by пишет ДЗ</string>
+    <string name="settings_hw_assigned">На уроке, где его задали</string>
+    <string name="settings_hw_assigned_hint">ДЗ на завтра берётся с предыдущего урока по тому же предмету. Так устроен дневник schools.by.</string>
+    <string name="settings_hw_due">На уроке, к которому его сделать</string>
+    <string name="settings_hw_due_hint">Выберите, если на главной ДЗ оказывается от прошлого урока.</string>
+    <string name="settings_open_site">Открыть сайт schools.by</string>
+    <string name="settings_other_account">Войти в другой аккаунт</string>
+    <string name="settings_clear">Удалить сохранённый дневник</string>
+    <string name="settings_clear_title">Удалить сохранённый дневник?</string>
+    <string name="settings_clear_text">Он заново загрузится с сайта.</string>
+    <string name="settings_footer">re:schools %1$s · данные хранятся только на этом устройстве</string>
+</resources>
