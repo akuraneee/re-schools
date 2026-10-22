@@ -22,7 +22,7 @@ import okhttp3.Response
  * Запросы к schools.by через OkHttp. Куки входа общие с WebView, в котором пользователь входит на сайте:
  * приложение пароль не видит и не хранит, а сессию берёт из [CookieManager].
  */
-class OkHttpFetcher : PageFetcher {
+class OkHttpFetcher(private val userAgent: String) : PageFetcher {
     private val client = OkHttpClient.Builder()
         .cookieJar(WebViewCookieJar)
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -35,6 +35,10 @@ class OkHttpFetcher : PageFetcher {
             .url(url)
             .header("X-Requested-With", "XMLHttpRequest")
             .header("Accept", "text/html, */*; q=0.01")
+            // как у браузера: сайт может по-другому отвечать клиентам с чужим User-Agent и без Referer
+            .header("User-Agent", userAgent)
+            .header("Accept-Language", "ru-RU,ru;q=0.9")
+            .header("Referer", Regex("^https?://[^/]+").find(url)?.value.orEmpty() + "/")
             .build()
         return try {
             client.newCall(request).await().use { Page(it.request.url.toString(), it.code, it.body.string()) }

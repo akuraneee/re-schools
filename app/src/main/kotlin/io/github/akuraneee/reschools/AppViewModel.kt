@@ -2,6 +2,7 @@ package io.github.akuraneee.reschools
 
 import android.app.Application
 import android.webkit.CookieManager
+import android.webkit.WebSettings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.akuraneee.reschools.core.AuthException
@@ -29,7 +30,7 @@ import kotlinx.coroutines.launch
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val persist = Persist(FileStore(File(application.filesDir, "rs")))
     private val profile = Profile(persist)
-    private val fetcher = OkHttpFetcher()
+    private val fetcher = OkHttpFetcher(WebSettings.getDefaultUserAgent(application))
 
     @Volatile private var session: PupilSession? = null
     private var refreshJob: Job? = null
