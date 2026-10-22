@@ -7,13 +7,31 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -25,7 +43,7 @@ import io.github.akuraneee.reschools.core.formatMean
 import io.github.akuraneee.reschools.core.parseMarkText
 import io.github.akuraneee.reschools.core.roundMark
 import io.github.akuraneee.reschools.ui.components.MarkBadge
-import io.github.akuraneee.reschools.ui.components.SectionHeader
+import io.github.akuraneee.reschools.ui.components.segmentedColors
 import io.github.akuraneee.reschools.ui.theme.LocalMarkPalette
 
 fun List<io.github.akuraneee.reschools.core.Quarter>.bands() =
@@ -39,13 +57,7 @@ fun LazyListScope.subjectItems(
     whatIf: String,
     onWhatIf: (String) -> Unit,
 ) {
-    item(key = "pick") {
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(st.subjects, key = { it.key }) { s ->
-                FilterChip(selected = s.key == subject.key, onClick = { onPick(s.key) }, label = { Text(s.name) })
-            }
-        }
-    }
+    item(key = "pick") { SubjectPicker(st, subject, onPick) }
     item(key = "kpis") {
         val c = subject.current
         val cur = st.currentQuarter
@@ -184,6 +196,52 @@ private fun ByQuarter(st: Stats, s: SubjectStats) {
                             Text(Ru.dayMonth(m.date), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/** Кнопка с текущим предметом; по нажатию — нижний лист со списком предметов и их годовыми отметками. */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) // ModalBottomSheet и сегментированные списки — экспериментальные в 1.5.0-beta
+@Composable
+private fun SubjectPicker(st: Stats, subject: SubjectStats, onPick: (String) -> Unit) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    val pickDescription = stringResource(R.string.stats_pick_subject)
+    FilledTonalButton(
+        onClick = { open = true },
+        shapes = ButtonDefaults.shapes(),
+        modifier = Modifier.fillMaxWidth().heightIn(min = ButtonDefaults.MediumContainerHeight)
+            .semantics { stateDescription = subject.name; contentDescription = pickDescription },
+    ) {
+        Text(subject.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1)
+        Icon(painterResource(R.drawable.ic_expand_more_24), contentDescription = null)
+    }
+    if (open) {
+        ModalBottomSheet(onDismissRequest = { open = false }) {
+            Text(
+                stringResource(R.string.stats_pick_subject),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).semantics { heading() },
+            )
+            LazyColumn(
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+            ) {
+                items(st.subjects.size, key = { st.subjects[it].key }) { i ->
+                    val s = st.subjects[i]
+                    val selected = s.key == subject.key
+                    SegmentedListItem(
+                        selected = selected,
+                        onClick = { onPick(s.key); open = false },
+                        shapes = ListItemDefaults.segmentedShapes(index = i, count = st.subjects.size),
+                        colors = segmentedColors(),
+                        supportingContent = { Text(stringResource(R.string.stats_marks_n, s.all.n)) },
+                        trailingContent = {
+                            val year = s.year.rounded
+                            if (year != null) MarkBadge(year, compact = true) else Text("—")
+                        },
+                    ) { Text(s.name) }
                 }
             }
         }

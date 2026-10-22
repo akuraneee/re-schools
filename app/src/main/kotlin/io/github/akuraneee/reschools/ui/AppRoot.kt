@@ -46,6 +46,7 @@ import io.github.akuraneee.reschools.AppViewModel
 import io.github.akuraneee.reschools.BuildConfig
 import io.github.akuraneee.reschools.R
 import io.github.akuraneee.reschools.UiState
+import io.github.akuraneee.reschools.ui.components.ProvideNow
 import io.github.akuraneee.reschools.ui.diary.DiaryScreen
 import io.github.akuraneee.reschools.ui.home.HomeScreen
 import io.github.akuraneee.reschools.ui.settings.SettingsScreen
@@ -71,7 +72,8 @@ fun AppRoot(viewModel: AppViewModel = viewModel()) {
     LifecycleEventEffect(Lifecycle.Event.ON_START) { viewModel.onAppStarted() }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.onAppStopped() }
 
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+    // часы для «что идёт сейчас» на главной и в дневнике
+    ProvideNow { Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         if (!state.ready) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
             return@Surface
@@ -106,6 +108,7 @@ fun AppRoot(viewModel: AppViewModel = viewModel()) {
                     onSelectPupil = viewModel::selectPupil,
                     onHomeworkMode = viewModel::setHomeworkMode,
                     onThreshold = viewModel::setThreshold,
+                    onBells = viewModel::setBells,
                     onOpenSite = { nav.navigate(Route.SITE) },
                     onOtherAccount = {
                         viewModel.forgetSiteLogin()
@@ -134,7 +137,7 @@ fun AppRoot(viewModel: AppViewModel = viewModel()) {
                 )
             }
         }
-    }
+    } }
 }
 
 /** «Главная», «Дневник» и «Статистика» под адаптивной навигацией: нижняя панель на телефоне, боковая — на планшете. */

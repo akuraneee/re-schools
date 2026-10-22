@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -39,7 +40,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.akuraneee.reschools.R
 import io.github.akuraneee.reschools.UiState
+import io.github.akuraneee.reschools.core.Bells
 import io.github.akuraneee.reschools.core.HwMode
+import io.github.akuraneee.reschools.core.Ru
 import io.github.akuraneee.reschools.core.formatMean
 import io.github.akuraneee.reschools.ui.components.ContentMaxWidth
 import io.github.akuraneee.reschools.ui.components.SectionHeader
@@ -58,6 +61,7 @@ fun SettingsScreen(
     onSelectPupil: (String) -> Unit,
     onHomeworkMode: (HwMode) -> Unit,
     onThreshold: (Double) -> Unit,
+    onBells: (Bells) -> Unit,
     onOpenSite: () -> Unit,
     onOtherAccount: () -> Unit,
     onClearData: () -> Unit,
@@ -96,6 +100,56 @@ fun SettingsScreen(
                                 ) { Text(pupil.name) }
                             }
                         }
+                    }
+                }
+                item(key = "bells") {
+                    val bells = state.settings.bells
+                    Section(stringResource(R.string.settings_bells)) {
+                        // шаг 5 минут; границы — чтобы расписание оставалось правдоподобным
+                        val rows = listOf(
+                            BellRow(R.string.settings_bells_start, Ru.clock(bells.firstLesson),
+                                bells.firstLesson > 6 * 60, bells.firstLesson < 12 * 60) { d -> bells.copy(firstLesson = bells.firstLesson + d) },
+                            BellRow(R.string.settings_bells_lesson, Ru.duration(bells.lessonMinutes),
+                                bells.lessonMinutes > 20, bells.lessonMinutes < 90) { d -> bells.copy(lessonMinutes = bells.lessonMinutes + d) },
+                            BellRow(R.string.settings_bells_break, Ru.duration(bells.breakMinutes),
+                                bells.breakMinutes > 5, bells.breakMinutes < 40) { d -> bells.copy(breakMinutes = bells.breakMinutes + d) },
+                        )
+                        SegmentedList(rows.size + 1) { index, shapes ->
+                            if (index == rows.size) {
+                                SegmentedListItem(
+                                    onClick = { onBells(Bells()) },
+                                    shapes = shapes,
+                                    colors = segmentedColors(),
+                                    supportingContent = { Text(stringResource(R.string.settings_bells_default_hint)) },
+                                ) { Text(stringResource(R.string.settings_bells_default)) }
+                            } else {
+                                val r = rows[index]
+                                val title = stringResource(r.title)
+                                SegmentedListItem(
+                                    shapes = shapes,
+                                    colors = segmentedColors(),
+                                    supportingContent = { Text(r.value, style = MaterialTheme.typography.titleMedium) },
+                                    trailingContent = {
+                                        Row {
+                                            TooltipIconButton(
+                                                R.drawable.ic_remove_24, stringResource(R.string.settings_bells_less, title),
+                                                onClick = { onBells(r.change(-5)) }, enabled = r.canLess,
+                                            )
+                                            TooltipIconButton(
+                                                R.drawable.ic_add_24, stringResource(R.string.settings_bells_more, title),
+                                                onClick = { onBells(r.change(5)) }, enabled = r.canMore,
+                                            )
+                                        }
+                                    },
+                                ) { Text(title) }
+                            }
+                        }
+                        Text(
+                            stringResource(R.string.settings_bells_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                        )
                     }
                 }
                 item(key = "homework") {
@@ -192,3 +246,5 @@ private fun Section(title: String, content: @Composable () -> Unit) {
         content()
     }
 }
+
+private class BellRow(val title: Int, val value: String, val canLess: Boolean, val canMore: Boolean, val change: (Int) -> Bells)

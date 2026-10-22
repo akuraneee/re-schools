@@ -46,8 +46,15 @@ data class Visit(val baseline: Snapshot? = null, val seen: Snapshot? = null, val
  */
 enum class HwMode { Assigned, Due }
 
+/** Звонки: первый урок в [firstLesson] (минуты от полуночи), уроки по [lessonMinutes], перемены по [breakMinutes]. */
 @Serializable
-data class Settings(val hwMode: HwMode = HwMode.Assigned, val threshold: Double = 0.5)
+data class Bells(val firstLesson: Int = 8 * 60, val lessonMinutes: Int = 45, val breakMinutes: Int = 15) {
+    fun start(num: Int): Int = firstLesson + (num - 1) * (lessonMinutes + breakMinutes)
+    fun end(num: Int): Int = start(num) + lessonMinutes
+}
+
+@Serializable
+data class Settings(val hwMode: HwMode = HwMode.Assigned, val threshold: Double = 0.5, val bells: Bells = Bells())
 
 /** Новая или исправленная отметка; [was] — что стояло раньше. */
 data class NewMark(val lesson: Lesson, val was: String?)

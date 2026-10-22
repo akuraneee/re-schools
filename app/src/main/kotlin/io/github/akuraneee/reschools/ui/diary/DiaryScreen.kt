@@ -49,7 +49,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.akuraneee.reschools.R
 import io.github.akuraneee.reschools.UiState
+import io.github.akuraneee.reschools.core.Bells
 import io.github.akuraneee.reschools.core.Lesson
+import io.github.akuraneee.reschools.core.NowStatus
+import io.github.akuraneee.reschools.core.minutesLeft
 import io.github.akuraneee.reschools.core.Ru
 import io.github.akuraneee.reschools.core.Week
 import io.github.akuraneee.reschools.core.formatMean
@@ -66,6 +69,7 @@ import io.github.akuraneee.reschools.ui.components.StatusBanner
 import io.github.akuraneee.reschools.ui.components.TooltipIconButton
 import io.github.akuraneee.reschools.ui.components.contentPaddingOf
 import io.github.akuraneee.reschools.ui.components.mergedRow
+import io.github.akuraneee.reschools.ui.components.rememberNowInfo
 import io.github.akuraneee.reschools.ui.components.segmentedColors
 import io.github.akuraneee.reschools.ui.components.rememberLinkified
 import java.time.LocalDate
@@ -188,13 +192,13 @@ private fun WeekPage(monday: LocalDate, state: UiState, padding: PaddingValues, 
                 if (loading || state.loading) LoadingIndicator() else EmptyNote(stringResource(R.string.diary_no_data))
             }
         } else {
-            WeekContent(monday, week, state.today, padding, isCurrentWeek)
+            WeekContent(monday, week, state.today, padding, isCurrentWeek, state.settings.bells)
         }
     }
 }
 
 @Composable
-private fun WeekContent(monday: LocalDate, week: Week, today: LocalDate, padding: PaddingValues, isCurrentWeek: Boolean) {
+private fun WeekContent(monday: LocalDate, week: Week, today: LocalDate, padding: PaddingValues, isCurrentWeek: Boolean, bells: Bells) {
     val listState = rememberLazyListState()
     // запас снизу, чтобы кнопка «Сегодня» не закрывала последнюю строку
     val contentPadding = contentPaddingOf(padding, bottom = 96.dp)
@@ -220,7 +224,7 @@ private fun WeekContent(monday: LocalDate, week: Week, today: LocalDate, padding
                 days.isEmpty() -> item { SegmentedNote(stringResource(R.string.diary_no_lessons_week)) }
                 else -> items(days.size, key = { days[it].first.toString() }) { index ->
                     val (date, lessons) = days[index]
-                    DaySection(date, lessons, isToday = date == today)
+                    DaySection(date, lessons, isToday = date == today, bells = bells)
                 }
             }
         }
@@ -228,14 +232,53 @@ private fun WeekContent(monday: LocalDate, week: Week, today: LocalDate, padding
 }
 
 @Composable
-private fun DaySection(date: LocalDate, lessons: List<Lesson>, isToday: Boolean) {
+private fun DaySection(date: LocalDate, lessons: List<Lesson>, isToday: Boolean, bells: Bells) {
+    // Сегодня: идущий урок помечен, перемена — отдельной строкой между уроками
+    val now = if (isToday) rememberNowInfo(lessons, date, bells) else null
+    val rows = buildList<DayRow> {
+        val st = now?.status
+        val seconds = now?.seconds ?: 0
+        for (l in lessons) {
+            if (st is NowStatus.Break && l.num == st.next.num && (isEmpty() || last() !is DayRow.Pause)) {
+                add(DayRow.Pause(st.next.start, minutesLeft(seconds, st.next.start)))
+            }
+            val left = if (st is NowStatus.InLesson && st.cur.num == l.num) minutesLeft(seconds, st.cur.end) else null
+            add(DayRow.Item(l, left))
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         DayHeader(date, lessons, isToday)
         if (lessons.isEmpty()) {
             SegmentedNote(stringResource(R.string.diary_no_lessons_day))
         } else {
-            SegmentedList(lessons.size) { index, shapes -> LessonRow(lessons[index], shapes) }
+            SegmentedList(rows.size) { index, shapes ->
+                when (val r = rows[index]) {
+                    is DayRow.Item -> LessonRow(r.lesson, shapes, r.left)
+                    is DayRow.Pause -> PauseRow(r, shapes)
+                }
+            }
         }
+    }
+}
+
+private sealed interface DayRow {
+    /** [left] — урок идёт сейчас, до звонка столько минут. */
+    data class Item(val lesson: Lesson, val left: Int?) : DayRow
+
+    /** Перемена до урока, который начинается в [until]. */
+    data class Pause(val until: Int, val left: Int) : DayRow
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun PauseRow(r: DayRow.Pause, shapes: ListItemShapes) {
+    SegmentedListItem(
+        shapes = shapes,
+        colors = segmentedColors(),
+        modifier = Modifier.mergedRow(),
+        supportingContent = { Text(stringResource(R.string.diary_break_until, Ru.duration(r.left), Ru.clock(r.until))) },
+    ) {
+        Text(stringResource(R.string.now_break), color = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -283,15 +326,26 @@ private fun DayHeader(date: LocalDate, lessons: List<Lesson>, isToday: Boolean) 
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun LessonRow(l: Lesson, shapes: ListItemShapes) {
+private fun LessonRow(l: Lesson, shapes: ListItemShapes, left: Int? = null) {
     SegmentedListItem(
         shapes = shapes,
         colors = segmentedColors(),
         modifier = Modifier.mergedRow(),
-        verticalAlignment = if (l.hw.isEmpty()) Alignment.CenterVertically else Alignment.Top,
-        leadingContent = { LessonNumber(l.num.toString()) },
-        supportingContent = if (l.hw.isNotEmpty()) {
-            { Text(rememberLinkified(l.hw), style = MaterialTheme.typography.bodyMedium) }
+        verticalAlignment = if (l.hw.isEmpty() && left == null) Alignment.CenterVertically else Alignment.Top,
+        leadingContent = { LessonNumber(l.num.toString(), highlighted = left != null) },
+        supportingContent = if (l.hw.isNotEmpty() || left != null) {
+            {
+                Column {
+                    if (left != null) {
+                        Text(
+                            stringResource(R.string.diary_lesson_now, Ru.duration(left)),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    if (l.hw.isNotEmpty()) Text(rememberLinkified(l.hw), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         } else null,
         trailingContent = if (l.marks.isNotEmpty() || l.absent) {
             { MarksRow(l, compact = true) }

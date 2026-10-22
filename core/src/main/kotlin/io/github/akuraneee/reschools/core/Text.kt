@@ -58,6 +58,12 @@ object Ru {
     /** «20 октября» */
     fun dateLong(d: LocalDate) = "${d.dayOfMonth} ${MONTHS_GEN[d.monthValue - 1]}"
 
+    /** «8:05» по минутам от полуночи */
+    fun clock(minutes: Int) = "%d:%02d".format(minutes / 60 % 24, minutes % 60)
+
+    /** «12 мин», «1 ч 5 мин» */
+    fun duration(minutes: Int) = if (minutes < 60) "$minutes мин" else if (minutes % 60 == 0) "${minutes / 60} ч" else "${minutes / 60} ч ${minutes % 60} мин"
+
     /** «20 окт» */
     fun dayMonth(d: LocalDate) = "${d.dayOfMonth} ${MONTHS_SHORT[d.monthValue - 1]}"
 

@@ -2,6 +2,7 @@ package io.github.akuraneee.reschools
 
 import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -15,6 +16,7 @@ import io.github.akuraneee.reschools.core.Pupil
 import io.github.akuraneee.reschools.core.TEST_PUPIL
 import androidx.compose.foundation.layout.WindowInsets
 import io.github.akuraneee.reschools.ui.MainScreen
+import io.github.akuraneee.reschools.ui.components.LocalNow
 import io.github.akuraneee.reschools.ui.diary.DiaryScreen
 import io.github.akuraneee.reschools.ui.settings.SettingsScreen
 import io.github.akuraneee.reschools.ui.stats.StatsScreen
@@ -87,6 +89,22 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun homeLight() = shot("home-light") { MainScreen(state(), {}, { _, _ -> }, {}, {}, {}) }
 
+    /** «Что сейчас»: перемена после первого урока и урок во время второго. */
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun homeBreak() = shot("home-break") {
+        CompositionLocalProvider(LocalNow provides LocalDateTime.of(2026, 10, 20, 8, 52)) { MainScreen(state(), {}, { _, _ -> }, {}, {}, {}) }
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun homeLesson() = shot("home-lesson") {
+        CompositionLocalProvider(LocalNow provides LocalDateTime.of(2026, 10, 20, 9, 20)) { MainScreen(state(), {}, { _, _ -> }, {}, {}, {}) }
+    }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun diaryBreak() = shot("diary-break") {
+        CompositionLocalProvider(LocalNow provides LocalDateTime.of(2026, 10, 20, 8, 52)) { DiaryScreen(state(), WindowInsets(0), { _, _ -> }, {}) }
+    }
+
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun homeFirstVisit() = shot("home-first-visit") { MainScreen(state(withNewMarks = false).copy(newMarks = null, baseline = null), {}, { _, _ -> }, {}, {}, {}) }
 
@@ -107,7 +125,7 @@ class ScreenshotTest {
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun settings() = shot("settings") {
-        SettingsScreen(state(pupils = listOf(TEST_PUPIL, Pupil("7654321", TEST_PUPIL.origin, "Тестова Анна"))), "0.2.0", {}, {}, {}, {}, {}, {}, {})
+        SettingsScreen(state(pupils = listOf(TEST_PUPIL, Pupil("7654321", TEST_PUPIL.origin, "Тестова Анна"))), "0.2.0", {}, {}, {}, {}, {}, {}, {}, {})
     }
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")

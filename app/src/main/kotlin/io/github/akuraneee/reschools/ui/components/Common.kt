@@ -168,12 +168,13 @@ fun MarksRow(lesson: Lesson, modifier: Modifier = Modifier, compact: Boolean = f
 
 /** Номер урока (или «2–3» у сдвоенных) в круге. */
 @Composable
-fun LessonNumber(text: String, modifier: Modifier = Modifier) {
+fun LessonNumber(text: String, modifier: Modifier = Modifier, highlighted: Boolean = false) {
     Surface(
         modifier = modifier.defaultMinSize(minWidth = 40.dp, minHeight = 40.dp),
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        // идущий сейчас урок — номер в акцентном цвете
+        color = if (highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = if (highlighted) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(

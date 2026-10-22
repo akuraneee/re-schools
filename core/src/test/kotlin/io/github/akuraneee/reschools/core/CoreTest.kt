@@ -292,3 +292,36 @@ class StatsTest {
         assertEquals(roundMark(7.3, 0.3), 8)
     }
 }
+
+class NowTest {
+    private val bells = Bells()
+    private val lessons = listOf(1, 2, 4).map { Lesson(TODAY, it, "Урок $it") }
+    private fun at(h: Int, m: Int, s: Int = 0) = h * 3600 + m * 60 + s
+
+    @Test
+    fun `звонки по умолчанию - 8 00, уроки 45 минут, перемены 15`() {
+        assertEquals("8:00", Ru.clock(bells.start(1)))
+        assertEquals("8:45", Ru.clock(bells.end(1)))
+        assertEquals("9:00", Ru.clock(bells.start(2)))
+        assertEquals("11:45", Ru.clock(bells.end(4)))
+    }
+
+    @Test
+    fun `урок, перемена, до уроков и после`() {
+        assertEquals(NowStatus.Before(daySchedule(lessons, TODAY, bells)[0]), nowStatus(lessons, TODAY, at(7, 50), bells))
+        val inFirst = nowStatus(lessons, TODAY, at(8, 30), bells) as NowStatus.InLesson
+        assertEquals(1, inFirst.cur.num)
+        assertEquals(2, inFirst.next!!.num)
+        assertEquals(15, minutesLeft(at(8, 30), inFirst.cur.end))
+        assertEquals(1, minutesLeft(at(8, 44, 30), inFirst.cur.end), "пока звонка не было — осталась минута")
+        val brk = nowStatus(lessons, TODAY, at(8, 50), bells) as NowStatus.Break
+        assertEquals(1 to 2, brk.prev.num to brk.next.num)
+        // третьего урока нет — после второго перемена до четвёртого
+        val gap = nowStatus(lessons, TODAY, at(10, 30), bells) as NowStatus.Break
+        assertEquals(4, gap.next.num)
+        assertEquals(NowStatus.After, nowStatus(lessons, TODAY, at(12, 0), bells))
+        assertEquals(NowStatus.NoLessons, nowStatus(lessons, TODAY.plusDays(1), at(9, 0), bells))
+        assertEquals("1 ч 5 мин", Ru.duration(65))
+    }
+}
+

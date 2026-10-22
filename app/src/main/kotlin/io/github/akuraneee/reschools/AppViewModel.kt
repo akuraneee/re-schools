@@ -6,6 +6,7 @@ import android.webkit.WebSettings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.akuraneee.reschools.core.AuthException
+import io.github.akuraneee.reschools.core.Bells
 import io.github.akuraneee.reschools.core.HwMode
 import io.github.akuraneee.reschools.core.OfflineException
 import io.github.akuraneee.reschools.core.Persist
@@ -156,6 +157,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setHomeworkMode(mode: HwMode) {
         profile.setSettings(profile.settings.copy(hwMode = mode))
+        publish()
+    }
+
+    fun setBells(value: Bells) {
+        profile.setSettings(profile.settings.copy(bells = value))
         publish()
     }
 

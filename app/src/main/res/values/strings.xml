@@ -53,6 +53,16 @@
     <string name="mark_absent_cd">Не был на уроке</string>
     <string name="mark_absent">н</string>
 
+    <!-- Что сейчас -->
+    <string name="now_lesson">Сейчас · %1$d урок</string>
+    <string name="now_left">До звонка %1$s</string>
+    <string name="now_then">Дальше: %1$s в %2$s</string>
+    <string name="now_break">Перемена</string>
+    <string name="now_bell_in">до звонка %1$s</string>
+    <string name="now_next">Следующий · %1$d урок в %2$s</string>
+    <string name="now_first">Первый урок через %1$s · в %2$s</string>
+    <string name="now_no_homework">ДЗ не задано</string>
+
     <!-- Дневник -->
     <string name="diary_prev_week">Предыдущая неделя</string>
     <string name="diary_next_week">Следующая неделя</string>
@@ -66,6 +76,8 @@
     <string name="diary_no_lessons_day">Уроков нет.</string>
     <string name="diary_average">ср. %1$s</string>
     <string name="diary_today_label">сегодня</string>
+    <string name="diary_lesson_now">Идёт · до звонка %1$s</string>
+    <string name="diary_break_until">до звонка %1$s · урок в %2$s</string>
 
     <!-- Статистика -->
     <string name="stats_title">Статистика</string>
@@ -106,6 +118,7 @@
     <string name="stats_risk_none">Таких предметов нет</string>
     <string name="stats_risk_item">%1$s: %2$s. Отметка ниже %3$d опустит до %4$d</string>
     <string name="stats_distribution">Распределение отметок</string>
+    <string name="stats_pick_subject">Выбрать предмет</string>
     <string name="stats_quarter_kpi">%1$s</string>
     <string name="stats_marks_n">отметок: %1$d</string>
     <string name="stats_no_marks_yet">отметок пока нет</string>
@@ -168,6 +181,15 @@
     <string name="settings_hw_due_hint">Выберите, если на главной ДЗ оказывается от прошлого урока.</string>
     <string name="settings_open_site">Открыть сайт schools.by</string>
     <string name="settings_other_account">Войти в другой аккаунт</string>
+    <string name="settings_bells">Звонки</string>
+    <string name="settings_bells_start">Начало первого урока</string>
+    <string name="settings_bells_lesson">Урок</string>
+    <string name="settings_bells_break">Перемена</string>
+    <string name="settings_bells_less">%1$s: меньше на 5 минут</string>
+    <string name="settings_bells_more">%1$s: больше на 5 минут</string>
+    <string name="settings_bells_default">По умолчанию</string>
+    <string name="settings_bells_default_hint">8:00, уроки по 45 минут, перемены по 15</string>
+    <string name="settings_bells_hint">По звонкам на главной и в дневнике видно, идёт ли урок или перемена и сколько до звонка.</string>
     <string name="settings_stats">Статистика</string>
     <string name="settings_threshold">Округлять вверх, если дробная часть ≥ %1$s</string>
     <string name="settings_threshold_hint">При 0,50: 7,50 → 8, а 7,49 → 7.</string>

@@ -3,6 +3,10 @@ package io.github.akuraneee.reschools.ui.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -51,6 +55,8 @@ import io.github.akuraneee.reschools.UiState
 import io.github.akuraneee.reschools.core.HomeworkItem
 import io.github.akuraneee.reschools.core.Lesson
 import io.github.akuraneee.reschools.core.NewMark
+import io.github.akuraneee.reschools.core.NowStatus
+import io.github.akuraneee.reschools.core.minutesLeft
 import io.github.akuraneee.reschools.core.Ru
 import io.github.akuraneee.reschools.core.homeworkFor
 import io.github.akuraneee.reschools.core.nextSchoolDay
@@ -58,7 +64,12 @@ import io.github.akuraneee.reschools.core.subjectTitle
 import io.github.akuraneee.reschools.core.todayMarks
 import io.github.akuraneee.reschools.ui.components.ContentMaxWidth
 import io.github.akuraneee.reschools.ui.components.EmptyNote
+import io.github.akuraneee.reschools.ui.components.BreakCard
+import io.github.akuraneee.reschools.ui.components.LessonNowCard
 import io.github.akuraneee.reschools.ui.components.LessonNumber
+import io.github.akuraneee.reschools.ui.components.NextLessonCard
+import io.github.akuraneee.reschools.ui.components.NowInfo
+import io.github.akuraneee.reschools.ui.components.rememberNowInfo
 import io.github.akuraneee.reschools.ui.components.MarksRow
 import io.github.akuraneee.reschools.ui.components.SectionHeader
 import io.github.akuraneee.reschools.ui.components.SegmentedList
@@ -71,7 +82,7 @@ import io.github.akuraneee.reschools.ui.components.segmentedColors
 import io.github.akuraneee.reschools.ui.components.rememberLinkified
 
 /**
- * «Главная»: новые отметки с прошлого захода (главный акцент экрана), отметки за сегодня и ДЗ на следующий учебный день.
+ * «Главная»: что идёт сейчас (урок или перемена), новые отметки с прошлого захода (главный акцент экрана), отметки за сегодня и ДЗ на следующий учебный день.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) // гибкие app bar и LoadingIndicator — экспериментальные в 1.5.0-beta
 @Composable
@@ -125,6 +136,7 @@ fun HomeScreen(
 
 @Composable
 private fun HomeContent(state: UiState, padding: PaddingValues, onRefresh: () -> Unit, onLogin: () -> Unit) {
+    val now = rememberNowInfo(state.lessons, state.today, state.settings.bells)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
             modifier = Modifier.widthIn(max = ContentMaxWidth).fillMaxWidth(),
@@ -137,6 +149,7 @@ private fun HomeContent(state: UiState, padding: PaddingValues, onRefresh: () ->
             if (!state.hasData) {
                 item(key = "empty") { EmptyNote(stringResource(R.string.not_loaded)) }
             } else {
+                if (now != null && now.status.shown()) item(key = "now") { NowSection(state, now) }
                 item(key = "new") { NewMarksSection(state) }
                 item(key = "today") { TodaySection(state) }
                 item(key = "homework") { HomeworkSection(state) }
@@ -156,6 +169,62 @@ private fun HomeContent(state: UiState, padding: PaddingValues, onRefresh: () ->
     }
 }
 
+// ---------- что сейчас ----------
+
+private fun NowStatus.shown() = this is NowStatus.InLesson || this is NowStatus.Break || this is NowStatus.Before
+
+/** Идёт урок — карточка урока; перемена — блок «Перемена» и под ним следующий урок с ДЗ; до уроков — первый урок. */
+@Composable
+private fun NowSection(state: UiState, now: NowInfo) {
+    val homework = homeworkFor(state.lessons, state.today, state.settings.hwMode)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        when (val st = now.status) {
+            is NowStatus.InLesson -> LessonNowCard(st.cur, st.next, now.seconds)
+            is NowStatus.Break -> {
+                BreakCard(st.prev.end, st.next.start, now.seconds)
+                NextLessonCard(st.next, stringResource(R.string.now_next, st.next.num, Ru.clock(st.next.start)), homework)
+            }
+            is NowStatus.Before -> NextLessonCard(
+                st.next,
+                stringResource(R.string.now_first, Ru.duration(minutesLeft(now.seconds, st.next.start)), Ru.clock(st.next.start)),
+                homework,
+            )
+            else -> Unit
+        }
+    }
+}
+
+// ---------- плитки отметок ----------
+
+/** Отметки плитками по две в ряд: отметка крупно, под ней предмет и подпись. */
+@Composable
+private fun MarkTiles(lessons: List<Lesson>, meta: @Composable (Int) -> String) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        lessons.indices.chunked(2).forEach { row ->
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { i -> MarkTile(lessons[i], meta(i), Modifier.weight(1f).fillMaxHeight()) }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun MarkTile(l: Lesson, meta: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.mergedRow(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            MarksRow(l)
+            Text(subjectTitle(l.subject), style = MaterialTheme.typography.titleMedium)
+            Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 // ---------- новые отметки ----------
 
 @Composable
@@ -171,7 +240,7 @@ private fun NewMarksSection(state: UiState) {
         when {
             list == null -> SegmentedNote(stringResource(R.string.home_new_first))
             list.isEmpty() -> SegmentedNote(stringResource(R.string.home_new_none, since.orEmpty()))
-            else -> SegmentedList(list.size) { index, shapes -> NewMarkRow(list[index], shapes) }
+            else -> MarkTiles(list.map { it.lesson }) { i -> newMarkMeta(list[i]) }
         }
     }
 }
@@ -214,25 +283,15 @@ private fun NewMarksHero(count: Int, since: String) {
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun NewMarkRow(item: NewMark, shapes: androidx.compose.material3.ListItemShapes) {
+private fun newMarkMeta(item: NewMark): String {
     val l = item.lesson
     val corrected = item.was?.let { stringResource(R.string.mark_corrected, it) }
-    val meta = buildList {
+    return buildList {
         add(Ru.dateShort(l.date))
         add(stringResource(R.string.lesson_number, l.num.toString()))
         corrected?.let(::add)
     }.joinToString(" · ")
-    SegmentedListItem(
-        shapes = shapes,
-        colors = segmentedColors(),
-        modifier = Modifier.mergedRow(),
-        leadingContent = { MarksRow(l) },
-        supportingContent = { Text(meta) },
-    ) {
-        Text(subjectTitle(l.subject))
-    }
 }
 
 // ---------- сегодня ----------
@@ -248,26 +307,12 @@ private fun TodaySection(state: UiState) {
             subtitle = "${Ru.dayName(today).lowercase()}, ${Ru.dateLong(today)}",
         )
         when {
-            marked.isNotEmpty() -> SegmentedList(marked.size) { index, shapes -> TodayRow(marked[index], shapes) }
+            marked.isNotEmpty() -> MarkTiles(marked) { i -> stringResource(R.string.lesson_number, marked[i].num.toString()) }
             !hasLessons -> SegmentedNote(
                 stringResource(if (today.dayOfWeek.value == 7) R.string.home_today_weekend else R.string.home_today_no_lessons),
             )
             else -> SegmentedNote(stringResource(R.string.home_today_no_marks))
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun TodayRow(l: Lesson, shapes: androidx.compose.material3.ListItemShapes) {
-    SegmentedListItem(
-        shapes = shapes,
-        colors = segmentedColors(),
-        modifier = Modifier.mergedRow(),
-        leadingContent = { MarksRow(l) },
-        supportingContent = { Text(stringResource(R.string.lesson_number, l.num.toString())) },
-    ) {
-        Text(subjectTitle(l.subject))
     }
 }
 
