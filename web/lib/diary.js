@@ -195,7 +195,8 @@
       if (from < floor) from = floor;
       const list = [];
       for (let d = cur; d >= from; d = RS.addDays(d, -7)) list.push(d);
-      list.splice(1, 0, RS.addDays(cur, 7)); // текущая, следующая, затем прошлые
+      if (list.length > 1) list.splice(2, 0, RS.addDays(cur, 7));
+      else list.push(RS.addDays(cur, 7)); // текущая, прошлая (держим в памяти для листания назад), следующая, затем старые
       return list;
     }
 
