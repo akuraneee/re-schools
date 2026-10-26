@@ -38,7 +38,7 @@ module.exports = async function selftest({ ses, site, createWindow }) {
     check('после входа открылось приложение', await waitFor(`location.pathname === '/__rs/index.html' && !!window.RS?.app`));
     check('ученик найден', await waitFor(`document.getElementById('who').textContent === 'Тестов Тест'`));
     check('главная загрузилась', await waitFor(ready));
-    const home = await js(`[...document.querySelectorAll('.card:not(.next) .card-h h2')].map((e) => e.textContent)`);
+    const home = await js(`[...document.querySelectorAll('.card:not(.now) .card-h h2')].map((e) => e.textContent)`);
     check('блоки главной', JSON.stringify(home.slice(0, 2)) === JSON.stringify(['Новые отметки', 'Сегодня']) && /^ДЗ /.test(home[2]));
     check('первый заход: подсказка вместо новых', await js(`document.querySelector('.card .empty').textContent.includes('после этого захода')`));
     check('запросы недели с X-Requested-With', site.requests.some((p) => p.includes('/dnevnik/quarter/')));
@@ -52,13 +52,13 @@ module.exports = async function selftest({ ses, site, createWindow }) {
       check('сейчас: идёт 2-й урок', await waitFor(`document.querySelector('.card.now .sub')?.textContent.startsWith('2 урок · 9:00–9:45') && document.querySelector('.card.now .left').textContent === 'ещё 35 мин'`));
       await shot('home-lesson');
       await setNow('08:50');
-      check('сейчас: перемена и следующий урок', await waitFor(`document.querySelector('.card.mini b')?.textContent === 'Перемена' && [...document.querySelectorAll('.card-h h2')].some((e) => e.textContent === 'Следующий урок')`));
+      check('сейчас: перемена и следующий урок', await waitFor(`document.querySelector('.card.now .brk-h b')?.textContent === 'Перемена' && document.querySelector('.card.now .now-next .sub')?.textContent === 'Следующий · 2 урок в 9:00'`));
       await shot('home-break');
       await setNow('07:00');
-      check('сейчас: неурочное время до уроков', await waitFor(`document.querySelector('.card.mini .sub')?.textContent === 'уроки с 8:00'`));
+      check('сейчас: неурочное время до уроков', await waitFor(`document.querySelector('.card.now .brk-h .sub')?.textContent === 'уроки с 8:00'`));
       await setNow('09:10');
     } else {
-      check('выходной: неурочное время', await waitFor(`document.querySelector('.card.mini b')?.textContent === 'Неурочное время'`));
+      check('выходной: неурочное время', await waitFor(`document.querySelector('.card.now .brk-h b')?.textContent === 'Неурочное время'`));
     }
 
     await js(`document.querySelector('.tabs button[data-tab=diary]').click()`);
@@ -66,8 +66,8 @@ module.exports = async function selftest({ ses, site, createWindow }) {
     if (weekday) {
       check('дневник: идёт урок', await js(`document.querySelector('#today .row.live .pill')?.textContent === 'идёт'`));
       await setNow('08:50');
-      check('дневник: перемена', await waitFor(`document.querySelector('#today .row.brk')?.textContent.includes('Перемена') && document.querySelector('#today .row.brk').nextElementSibling.querySelector('.num').textContent === '2'`));
-      await js(`document.getElementById('today').scrollIntoView({ block: 'start' })`);
+      check('дневник: перемена', await waitFor(`document.querySelector('.card.now .brk-h b')?.textContent === 'Перемена'`));
+      await js(`window.scrollTo(0, 0)`);
       await shot('diary-break');
       await setNow('09:10');
     }

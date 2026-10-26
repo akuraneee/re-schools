@@ -274,22 +274,24 @@
   const at = (m) => RS.fromMin(m).replace(/^0/, '');
   const subjOf = (x) => x.lessons.map((l) => subj(l.subject)).join(' / ');
   // Сколько осталось — обновляется раз в 15 секунд без перерисовки (tick).
-  const left = (end) => `<span class="left" data-end="${end}">${leftText(end)}</span>`;
-  function leftText(end) {
+  const left = (end, pre = 'ещё') => `<span class="left" data-end="${end}" data-pre="${pre}">${leftText(end, pre)}</span>`;
+  function leftText(end, pre = 'ещё') {
     const n = Math.max(1, Math.ceil(end - nowMin()));
-    return n >= 60 ? `ещё ${Math.floor(n / 60)} ч ${n % 60} мин` : `ещё ${n} мин`;
+    return n >= 60 ? `${pre} ${Math.floor(n / 60)} ч ${n % 60} мин` : `${pre} ${n} мин`;
   }
   const progress = (x) => `<div class="now-bar"><i data-start="${x.start}" data-end="${x.end}" style="width:${pct(x)}%"></i></div>`;
   const pct = (x) => Math.max(0, Math.min(100, ((nowMin() - x.start) / (x.end - x.start)) * 100));
 
-  function nextLessonCard(all, today, x, title) {
+  // Следующий урок внутри общего блока «Текущий урок».
+  function nextPart(all, today, x, label) {
     const hw = RS.homeworkFor(all, today, S.settings.hwMode).find((it) => it.nums.includes(x.num));
-    return `<section class="card next">
-      <div class="card-h"><h2>${title}</h2><span class="sub">${x.num} урок · ${span(x)}</span></div>
+    return `<div class="now-next">
+      <div class="sub">${label} · ${x.num} урок в ${at(x.start)}</div>
       <div class="name">${subjOf(x)}</div>
-      ${hw && hw.hw ? `<div class="hw">${linkify(hw.hw)}</div>` : ''}</section>`;
+      ${hw && hw.hw ? `<div class="hw">${linkify(hw.hw)}</div>` : ''}</div>`;
   }
 
+  // Один блок «Текущий урок»: идущий урок; перемена (цветом) + следующий урок; неурочное время + первый урок.
   function nowCards(all, today) {
     const st = nowStatus(all, today);
     if (st.kind === 'lesson') {
@@ -301,13 +303,17 @@
       </section>`;
     }
     if (st.kind === 'break') {
-      return `<section class="card mini"><b>Перемена</b><span class="sub">до ${at(st.end)}</span>${left(st.end)}</section>` +
-        nextLessonCard(all, today, st.next, 'Следующий урок');
+      return `<section class="card now">
+        <div class="brk-box"><div class="brk-h"><b>Перемена</b>${left(st.end, 'до звонка')}</div>${progress(st)}</div>
+        ${nextPart(all, today, st.next, 'Следующий')}
+      </section>`;
     }
     const text = st.reason === 'before' ? `уроки с ${at(st.next.start)}`
       : st.reason === 'after' ? `уроки закончились в ${at(st.last.end)}` : 'сегодня уроков нет';
-    return `<section class="card mini"><b>Неурочное время</b><span class="sub">${text}</span>${st.reason === 'before' ? left(st.next.start) : ''}</section>` +
-      (st.reason === 'before' ? nextLessonCard(all, today, st.next, 'Первый урок') : '');
+    return `<section class="card now">
+      <div class="brk-box free"><div class="brk-h"><b>Неурочное время</b><span class="sub">${text}</span>${st.reason === 'before' ? left(st.next.start, 'до начала') : ''}</div></div>
+      ${st.reason === 'before' ? nextPart(all, today, st.next, 'Первый') : ''}
+    </section>`;
   }
 
   // Перерисовываем, когда урок сменился переменой и т. п.; иначе только «осталось» и полоски.
@@ -320,7 +326,7 @@
   function tick() {
     if (document.visibilityState !== 'visible' || S.needLogin || !['home', 'diary'].includes(S.tab)) return;
     if (nowKeyOf() !== nowKey) return render();
-    for (const el of document.querySelectorAll('.left[data-end]')) el.textContent = leftText(+el.dataset.end);
+    for (const el of document.querySelectorAll('.left[data-end]')) el.textContent = leftText(+el.dataset.end, el.dataset.pre);
     for (const el of document.querySelectorAll('.now-bar i')) el.style.width = `${pct({ start: +el.dataset.start, end: +el.dataset.end })}%`;
   }
   setInterval(tick, 15000);
@@ -421,14 +427,11 @@
       if (!ls.length && RS.parseISO(d).getDay() === 6) return '';
       const vals = ls.flatMap((l) => l.marks);
       const avg = vals.length ? `<span class="day-avg">ср. ${RS.fmt(RS.mean(vals))}</span>` : '';
-      // Сегодня: идущий урок помечен «идёт», перемена — отдельной строкой перед следующим уроком.
+      // Сегодня: идущий урок помечен «идёт».
       const st = d === today ? nowStatus(ls, today) : null;
       const rows = ls.length ? ls.map((l) => {
         const live = st && st.kind === 'lesson' && st.cur.num === l.num;
-        const brk = st && st.kind === 'break' && st.next.num === l.num && st.next.lessons[0] === l
-          ? `<div class="row brk"><div class="num"></div><div class="main"><div class="name">Перемена</div>
-              <div class="meta">${at(st.start)}–${at(st.end)} · ${left(st.end)}</div></div></div>` : '';
-        return `${brk}<div class="row${live ? ' live' : ''}">
+        return `<div class="row${live ? ' live' : ''}">
           <div class="num">${l.num}</div>
           <div class="main"><div class="name">${subj(l.subject)}${live ? ' <span class="pill">идёт</span>' : ''}</div>
             ${live ? `<div class="meta">${span(st.cur)} · ${left(st.cur.end)}</div>` : ''}${l.hw ? `<div class="hw">${linkify(l.hw)}</div>` : ''}</div>
@@ -439,7 +442,7 @@
         <div class="day-h"><h3>${dayName(d)}</h3><span class="sub">${dateLong(d)}</span>${d === today ? '<span class="pill">сегодня</span>' : ''}${avg}</div>
         ${rows}</section>`;
     }).join('');
-    return bar + days;
+    return bar + (dates.has(today) ? nowCards(lessons(), today) : '') + days;
   }
 
   // ---------- статистика (из schools++, src/ui.js) ----------
