@@ -1,5 +1,5 @@
 # Тесты и APK на каждый push в любую ветку (APK — в артефактах запуска). При push в main — релиз
-# v<major>.<minor>.<номер сборки> с файлом re-schools-android.apk (major.minor — из package.json).
+# v<major>.<minor>.<номер сборки> с файлом re-schools-android.apk (major.minor — rs.version в gradle.properties).
 # pull_request не нужен: проверки push-запуска и так видны в PR из ветки этого репозитория.
 name: Сборка
 
@@ -24,15 +24,15 @@ jobs:
       version: ${{ steps.v.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-java@v4
         with:
-          node-version: 22
-      - run: npm ci
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
-      - run: npm test
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      # Ядро (разбор schools.by, дневник, логика) — на выдуманном сайте; без Android SDK
+      - run: ./gradlew -PcoreOnly :core:test --console=plain
       - id: v
-        run: echo "version=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')").${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(grep '^rs.version=' gradle.properties | cut -d= -f2 | cut -d. -f1,2).${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
 
   android:
     name: APK для Android
@@ -43,10 +43,15 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.11.1
+      - name: Платформа Android SDK 37
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" --list | grep -E "platforms;android-3[5-9]" || true
+          # платформа 37 называется то android-37, то android-37.0 — пробуем оба варианта
+          "$SDKM" "platforms;android-37" "build-tools;36.0.0" || "$SDKM" "platforms;android-37.0" "build-tools;36.0.0"
       - name: Ключ подписи (если добавлен в секреты)
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -63,9 +68,9 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          gradle -p android assembleRelease --console=plain
+          ./gradlew :app:assembleRelease --console=plain
           mkdir -p out
-          cp android/app/build/outputs/apk/release/app-release.apk out/re-schools-android.apk
+          cp app/build/outputs/apk/release/app-release.apk out/re-schools-android.apk
       - uses: actions/upload-artifact@v4
         with:
           name: android

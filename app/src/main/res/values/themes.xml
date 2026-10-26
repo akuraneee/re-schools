@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="icon_bg">#FF2F6FDE</color>
+
+    <!-- Окно до первого кадра Compose: системные цвета, дальше всё рисует MaterialExpressiveTheme. -->
+    <style name="Theme.ReSchools" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

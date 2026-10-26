@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">re:schools</string>
+
+    <!-- Навигация и общие действия -->
+    <string name="nav_home">Главная</string>
+    <string name="nav_diary">Дневник</string>
+    <string name="nav_stats">Статистика</string>
+    <string name="settings_title">Настройки</string>
+    <string name="action_refresh">Обновить</string>
+    <string name="action_settings">Настройки</string>
+    <string name="action_back">Назад</string>
+    <string name="action_retry">Повторить</string>
+    <string name="action_sign_in">Войти</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_delete">Удалить</string>
+
+    <!-- Вход -->
+    <string name="welcome_title">re:schools</string>
+    <string name="welcome_text">Дневник schools.by в удобном виде: отметки за сегодня, ДЗ на завтра и новые отметки с прошлого раза.</string>
+    <string name="welcome_button">Войти через schools.by</string>
+    <string name="welcome_note">Вход — на самом сайте schools.by. Приложение не видит пароль и никуда не отправляет ваши данные.</string>
+    <string name="web_login_title">Вход в schools.by</string>
+    <string name="web_site_title">Сайт schools.by</string>
+    <string name="no_pupil_found">Не нашёл ученика на странице после входа.</string>
+
+    <!-- Состояние загрузки -->
+    <string name="error_auth">Вход на schools.by истёк.</string>
+    <string name="error_offline">Нет связи с schools.by — показаны сохранённые данные.</string>
+    <string name="error_other">Не удалось загрузить дневник: %1$s</string>
+    <string name="progress_refresh">Обновляю дневник… %1$d из %2$d</string>
+    <string name="loading_diary">Загружаю дневник…</string>
+    <string name="not_loaded">Дневник ещё не загружен.</string>
+
+    <!-- Главная -->
+    <string name="home_new_marks">Новые отметки</string>
+    <string name="home_new_since">с прошлого захода, %1$s</string>
+    <string name="home_new_first">Здесь появятся отметки, которые выставят после этого захода (кроме сегодняшних — они ниже).</string>
+    <string name="home_new_none">С прошлого захода (%1$s) новых отметок нет.</string>
+    <string name="home_new_count_cd">Новых отметок: %1$d</string>
+    <string name="home_today">Сегодня</string>
+    <string name="home_today_no_marks">Отметок пока нет.</string>
+    <string name="home_today_no_lessons">Сегодня уроков нет.</string>
+    <string name="home_today_weekend">Сегодня выходной.</string>
+    <string name="home_homework">ДЗ %1$s</string>
+    <string name="home_homework_no_schedule">Расписания на %1$s в дневнике пока нет.</string>
+    <string name="home_homework_none">не задано</string>
+    <string name="home_homework_from">задано %1$s</string>
+    <string name="home_updated">Обновлено %1$s</string>
+    <string name="mark_corrected">исправлена, было %1$s</string>
+    <string name="lesson_number">%1$s урок</string>
+    <string name="mark_cd">Отметка %1$d</string>
+    <string name="mark_absent_cd">Не был на уроке</string>
+    <string name="mark_absent">н</string>
+
+    <!-- Что сейчас -->
+    <string name="now_lesson">Сейчас · %1$d урок</string>
+    <string name="now_left">До звонка %1$s</string>
+    <string name="now_then">Дальше: %1$s в %2$s</string>
+    <string name="now_break">Перемена</string>
+    <string name="now_bell_in">до звонка %1$s</string>
+    <string name="now_next">Следующий · %1$d урок в %2$s</string>
+    <string name="now_first">Первый урок через %1$s · в %2$s</string>
+    <string name="now_no_homework">ДЗ не задано</string>
+
+    <!-- Дневник -->
+    <string name="diary_prev_week">Предыдущая неделя</string>
+    <string name="diary_next_week">Следующая неделя</string>
+    <string name="diary_to_today">Сегодня</string>
+    <string name="diary_this_week">эта неделя</string>
+    <string name="diary_next_week_label">следующая неделя</string>
+    <string name="diary_prev_week_label">прошлая неделя</string>
+    <string name="diary_no_data">Нет данных за эту неделю.</string>
+    <string name="diary_vacation">Этой недели нет в дневнике — похоже, каникулы.</string>
+    <string name="diary_no_lessons_week">На этой неделе уроков нет.</string>
+    <string name="diary_no_lessons_day">Уроков нет.</string>
+    <string name="diary_average">ср. %1$s</string>
+    <string name="diary_today_label">сегодня</string>
+    <string name="diary_lesson_now">Идёт · до звонка %1$s</string>
+    <string name="diary_break_until">до звонка %1$s · урок в %2$s</string>
+
+    <!-- Статистика -->
+    <string name="stats_title">Статистика</string>
+    <string name="stats_tab_overview">Обзор</string>
+    <string name="stats_tab_subject">Предмет</string>
+    <string name="stats_tab_dynamics">Динамика</string>
+    <string name="stats_loading">Загружаю дневник за учебный год… %1$d из %2$d</string>
+    <string name="stats_none">Отметок за этот учебный год пока нет.</string>
+    <string name="stats_kpi_quarter">Средний балл · %1$s</string>
+    <string name="stats_kpi_quarter_sub">среднее по предметам</string>
+    <string name="stats_kpi_rounded">по округл. %1$s</string>
+    <string name="stats_kpi_year">Годовой средний</string>
+    <string name="stats_kpi_year_sub">по четвертным отметкам</string>
+    <string name="stats_kpi_all">Все отметки</string>
+    <string name="stats_kpi_all_sub">отметок: %1$d</string>
+    <string name="stats_kpi_30">Последние 30 дней</string>
+    <string name="stats_kpi_30_sub">к прошлым 30 дням: %1$s</string>
+    <string name="stats_kpi_30_count">отметок: %1$d</string>
+    <string name="stats_kpi_absences">Пропуски</string>
+    <string name="stats_kpi_absences_sub">из %1$d уроков · %2$s%%</string>
+    <string name="stats_subjects">Предметы</string>
+    <string name="stats_sort">Сортировка</string>
+    <string name="stats_sort_name">по названию</string>
+    <string name="stats_sort_year">по годовой</string>
+    <string name="stats_sort_current">по текущей четверти</string>
+    <string name="stats_sort_trend">по тренду</string>
+    <string name="stats_sort_absences">по пропускам</string>
+    <string name="stats_year">год</string>
+    <string name="stats_card_foot">отм.: %1$d · ср. %2$s</string>
+    <string name="stats_card_absences">пропуски %1$d</string>
+    <string name="stats_total">Средний балл</string>
+    <string name="stats_round_note">Крупная цифра — округлённая отметка, мелкая — точное среднее. Годовая считается как среднее округлённых четвертных. Порог округления: %1$s (меняется в настройках).</string>
+    <string name="stats_no_marks">Без отметок: %1$s.</string>
+    <string name="stats_near">Почти следующая отметка</string>
+    <string name="stats_near_none">Нет предметов рядом с границей</string>
+    <string name="stats_near_item">%1$s: %2$s → %3$d, нужно %4$d×%5$d</string>
+    <string name="stats_risk">На грани понижения</string>
+    <string name="stats_risk_none">Таких предметов нет</string>
+    <string name="stats_risk_item">%1$s: %2$s. Отметка ниже %3$d опустит до %4$d</string>
+    <string name="stats_distribution">Распределение отметок</string>
+    <string name="stats_pick_subject">Выбрать предмет</string>
+    <string name="stats_quarter_kpi">%1$s</string>
+    <string name="stats_marks_n">отметок: %1$d</string>
+    <string name="stats_no_marks_yet">отметок пока нет</string>
+    <string name="stats_year_kpi">Годовая</string>
+    <string name="stats_year_sub">по %1$d из %2$d четв.</string>
+    <string name="stats_all_year">За год (все отметки)</string>
+    <string name="stats_median_mode">Медиана · мода</string>
+    <string name="stats_min_max">мин %1$d, макс %2$d</string>
+    <string name="stats_spread">Разброс</string>
+    <string name="stats_spread_sub">стандартное отклонение</string>
+    <string name="stats_trend">Тренд</string>
+    <string name="stats_trend_sub">последние 5: %1$s (были %2$s)</string>
+    <string name="stats_absences_sub">из %1$d уроков</string>
+    <string name="stats_need">Что нужно в этой четверти</string>
+    <string name="stats_need_none">Отметок в текущей четверти пока нет</string>
+    <string name="stats_need_up">Чтобы получить %1$d: %2$s</string>
+    <string name="stats_need_max">Уже максимальная отметка</string>
+    <string name="stats_need_safe">Одна любая отметка не опустит ниже %1$d</string>
+    <string name="stats_need_down">Одна отметка ниже %1$d опустит до %2$d</string>
+    <string name="stats_whatif">А что если…</string>
+    <string name="stats_whatif_hint">Добавить отметки, например 9 10 8</string>
+    <string name="stats_whatif_empty">Введите отметки — посчитаю среднее в текущей четверти.</string>
+    <string name="stats_whatif_result">Среднее %1$s → %2$d (сейчас %3$s)</string>
+    <string name="stats_whatif_result_new">Среднее %1$s → %2$d</string>
+    <string name="stats_chart">Динамика</string>
+    <string name="stats_legend_mark">отметка</string>
+    <string name="stats_legend_avg">среднее в четверти на эту дату</string>
+    <string name="stats_by_quarter">Отметки по четвертям</string>
+    <string name="stats_quarter_line">%1$s · %2$s · %3$d отм. · мин %4$d, макс %5$d</string>
+    <string name="stats_quarter_empty">нет отметок</string>
+    <string name="stats_weekly">Средний балл по неделям</string>
+    <string name="stats_legend_week">среднее за неделю</string>
+    <string name="stats_legend_cumulative">накопленное среднее с начала года</string>
+    <string name="stats_weeks">Недели</string>
+    <string name="stats_best_week">Лучшая: с %1$s, %2$s (отм.: %3$d)</string>
+    <string name="stats_worst_week">Худшая: с %1$s, %2$s (отм.: %3$d)</string>
+    <string name="stats_weeks_count">Недель с отметками: %1$d, в среднем %2$s отм. в неделю</string>
+    <string name="stats_weekdays">По дням недели</string>
+    <string name="stats_changes">Изменения по предметам</string>
+    <string name="stats_col_subject">Предмет</string>
+    <string name="stats_col_before">30–60 дн.</string>
+    <string name="stats_col_recent">30 дн.</string>
+    <string name="stats_col_change">Изм.</string>
+    <string name="stats_col_trend">Тренд</string>
+    <string name="stats_quarters">По четвертям</string>
+    <string name="stats_col_quarter">Четверть</string>
+    <string name="stats_col_exact">Точно</string>
+    <string name="stats_col_rounded">Округл.</string>
+    <string name="stats_col_marks">Отм.</string>
+    <string name="stats_in_progress">идёт</string>
+    <string name="stats_trend_per_month">%1$s/мес</string>
+    <string name="stats_subject_cd">%1$s: годовая %2$s, отметок %3$d</string>
+
+    <!-- Настройки -->
+    <string name="settings_pupil">Ученик</string>
+    <string name="settings_homework">Где schools.by пишет ДЗ</string>
+    <string name="settings_hw_assigned">На уроке, где его задали</string>
+    <string name="settings_hw_assigned_hint">ДЗ на завтра берётся с предыдущего урока по тому же предмету. Так устроен дневник schools.by.</string>
+    <string name="settings_hw_due">На уроке, к которому его сделать</string>
+    <string name="settings_hw_due_hint">Выберите, если на главной ДЗ оказывается от прошлого урока.</string>
+    <string name="settings_open_site">Открыть сайт schools.by</string>
+    <string name="settings_other_account">Войти в другой аккаунт</string>
+    <string name="settings_bells">Звонки</string>
+    <string name="settings_bells_start">Начало первого урока</string>
+    <string name="settings_bells_lesson">Урок</string>
+    <string name="settings_bells_break">Перемена</string>
+    <string name="settings_bells_less">%1$s: меньше на 5 минут</string>
+    <string name="settings_bells_more">%1$s: больше на 5 минут</string>
+    <string name="settings_bells_default">По умолчанию</string>
+    <string name="settings_bells_default_hint">8:00, уроки по 45 минут, перемены по 15</string>
+    <string name="settings_bells_hint">По звонкам на главной и в дневнике видно, идёт ли урок или перемена и сколько до звонка.</string>
+    <string name="settings_stats">Статистика</string>
+    <string name="settings_threshold">Округлять вверх, если дробная часть ≥ %1$s</string>
+    <string name="settings_threshold_hint">При 0,50: 7,50 → 8, а 7,49 → 7.</string>
+    <string name="settings_clear">Удалить сохранённый дневник</string>
+    <string name="settings_clear_title">Удалить сохранённый дневник?</string>
+    <string name="settings_clear_text">Он заново загрузится с сайта.</string>
+    <string name="settings_footer">re:schools %1$s · данные хранятся только на этом устройстве</string>
+</resources>
