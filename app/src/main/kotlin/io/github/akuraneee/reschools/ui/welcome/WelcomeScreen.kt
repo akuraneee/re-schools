@@ -36,7 +36,7 @@ import io.github.akuraneee.reschools.UiState
 import io.github.akuraneee.reschools.ui.components.StatusBanner
 
 /**
- * Первый экран: вход через сайт schools.by. Главный акцент — логотип в «печенье» MaterialShapes
+ * Первый экран: кнопка входа в schools.by. Главный акцент — логотип в «печенье» MaterialShapes
  * и единственная заливная кнопка.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class) // MaterialShapes и размеры кнопок — экспериментальные в 1.5.0-beta

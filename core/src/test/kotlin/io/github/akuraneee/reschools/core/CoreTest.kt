@@ -325,3 +325,42 @@ class NowTest {
     }
 }
 
+
+class LoginTest {
+    private val loginUrl = "$HOST/login"
+
+    @Test
+    fun `вход формой - с CSRF-токеном, после него открывается страница ученика`() = runBlocking {
+        val site = FakeSite(TODAY, loggedIn = false)
+        val result = FakeFetcher(site).signIn(" test ", "secret", loginUrl)
+        assertEquals(LoginResult.Landed("$HOST/pupil/$PID"), result)
+        assertTrue(site.loggedIn)
+        assertEquals(listOf(PID), FakeFetcher(site).discoverPupils("$HOST/pupil/$PID").map { it.id })
+    }
+
+    @Test
+    fun `неверный пароль - текст ошибки с сайта`() = runBlocking {
+        val site = FakeSite(TODAY, loggedIn = false)
+        assertEquals(LoginResult.Rejected("Неверный логин или пароль"), FakeFetcher(site).signIn("test", "wrong", loginUrl))
+        assertFalse(site.loggedIn)
+    }
+
+    @Test
+    fun `уже вошли - форма не нужна`() = runBlocking {
+        assertEquals(LoginResult.Landed("$HOST/pupil/$PID"), FakeFetcher(FakeSite(TODAY)).signIn("x", "y", loginUrl))
+    }
+
+    @Test
+    fun `капча на форме - вход только на сайте`() {
+        val doc = Jsoup.parse(
+            """<form action="/login" method="post"><input name="username"><input type="password" name="password">
+            <div class="g-recaptcha" data-sitekey="k"></div></form>""",
+            "https://schools.by/login",
+        )
+        assertNull(findLoginForm(doc))
+        val plain = findLoginForm(Jsoup.parse(FakeSite(TODAY, loggedIn = false).handle(loginUrl).body, loginUrl))
+        assertNotNull(plain)
+        assertEquals(listOf("csrfmiddlewaretoken" to CSRF, "username" to "u", "password" to "p"), plain.fields("u", "p"))
+        assertEquals(loginUrl, plain.action)
+    }
+}

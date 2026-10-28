@@ -8,6 +8,7 @@ import java.time.LocalDate
 
 const val PID = "1234567"
 const val HOST = "https://demo.schools.by"
+const val CSRF = "test-csrf-token"
 
 val TEST_PUPIL = Pupil(PID, HOST, "Тестов Тест")
 
@@ -178,14 +179,20 @@ class FakeSite(val today: LocalDate, var loggedIn: Boolean = true) {
 
     private val login = """<!doctype html><html><head><meta charset="utf-8"><title>Вход</title></head>
     <body><h1>schools.by — вход (выдуманный)</h1>
-    <form action="$HOST/do-login" method="get"><input name="u" value="test"><input type="password" name="p" value="x">
+    ${'$'}ERRORS<form action="/login" method="post"><input type="hidden" name="csrfmiddlewaretoken" value="$CSRF">
+    <input type="text" name="username"><input type="password" name="password">
     <button id="go">Войти</button></form></body></html>"""
 
-    fun handle(url: String): FakeResponse {
+    /** Пост входа: правильные логин и пароль — `test`/`secret`, токен — [CSRF]. */
+    fun handle(url: String, form: Map<String, String>? = null): FakeResponse {
         val path = java.net.URI(url).path
         requests += path
-        if (path == "/login") return FakeResponse(200, login)
-        if (path == "/do-login") { loggedIn = true; return FakeResponse(302, "", "$HOST/pupil/$PID") }
+        if (path == "/login" && form != null) {
+            if (form["csrfmiddlewaretoken"] != CSRF) return FakeResponse(403, "CSRF verification failed")
+            if (form["username"] == "test" && form["password"] == "secret") { loggedIn = true; return FakeResponse(302, "", "$HOST/pupil/$PID") }
+            return FakeResponse(200, login.replace("\$ERRORS", "<ul class=\"errorlist\"><li>Неверный логин или пароль</li></ul>"))
+        }
+        if (path == "/login") return if (loggedIn) FakeResponse(302, "", "$HOST/pupil/$PID") else FakeResponse(200, login.replace("\$ERRORS", ""))
         if (!loggedIn) return FakeResponse(302, "", "$HOST/login")
         if (path == "/pupil/$PID") return FakeResponse(200, profile)
         if (path == "/pupil/$PID/dnevnik") {
@@ -205,10 +212,16 @@ class FakeSite(val today: LocalDate, var loggedIn: Boolean = true) {
 
 /** Транспорт к выдуманному сайту; переходы по редиректам — как в браузере. */
 class FakeFetcher(val site: FakeSite) : PageFetcher {
-    override suspend fun fetch(url: String): Page {
+    override suspend fun fetch(url: String): Page = request(url, null)
+
+    override suspend fun post(url: String, fields: List<Pair<String, String>>, referer: String): Page = request(url, fields.toMap())
+
+    private fun request(url: String, form: Map<String, String>?): Page {
         var u = java.net.URI(url).toString()
+        var body = form
         repeat(5) {
-            val r = site.handle(u)
+            val r = site.handle(u, body)
+            body = null // после редиректа — GET, как у браузера
             if (r.status in 300..399) { u = java.net.URI(u).resolve(r.location!!).toString(); return@repeat }
             return Page(u, r.status, r.body)
         }

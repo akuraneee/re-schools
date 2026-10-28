@@ -16,7 +16,10 @@ Android-приложение к дневнику schools.by: «Главная» 
   собирать и проверять приложение: «фальшивый» SDK (`sdk.dir` в `local.properties`) — `platforms/android-37/android.jar`
   из `org.robolectric:android-all` со стёртыми телами методов, `core-for-system-modules.jar` из `java.base.jmod`,
   заглушки в `build-tools/36.0.0`, JDK 21 с `jlink`. С ним работают `:app:assembleRelease` и скриншот-тесты, но сам такой SDK в репозиторий не входит
-  (лежал во временном каталоге сессии); настоящий APK собирает GitHub Actions.
+  (лежал во временном каталоге сессии); настоящий APK собирает GitHub Actions. Тонкости: AGP 9 ищет `android-37.0`
+  и не принимает самодельный package.xml для него — проще положить платформу как `platforms/android-36` и в копии
+  проекта поставить `compileSdk = 36` с отключёнными задачами `*AarMetadata*`; в стёртом android.jar конструкторы должны
+  вызывать `super(...)` (иначе VerifyError в Robolectric), а в core-for-system-modules.jar — только `.class` без module-info.
 - compileSdk 37 обязателен: Material3 1.5.0-beta02 и OkHttp 5.5 требуют его (`checkAarMetadata`).
 - Звонки — `Settings.bells` (`Bells`: начало, урок, перемена), «что сейчас» — `nowStatus` в `core/…/Now.kt`; часы в
   интерфейсе — `LocalNow` (`ui/components/Now.kt`), без них блоки не показываются (скриншот-тесты подставляют время сами).

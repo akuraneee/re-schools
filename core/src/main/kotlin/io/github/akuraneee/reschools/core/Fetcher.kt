@@ -11,6 +11,10 @@ class Page(val url: String, val status: Int, val html: String) {
 /** Транспорт. Запросы идут с куками входа на schools.by; нет связи — [OfflineException]. */
 fun interface PageFetcher {
     suspend fun fetch(url: String): Page
+
+    /** Отправка формы (POST, application/x-www-form-urlencoded) с переходами по редиректам — нужна только для входа. */
+    suspend fun post(url: String, fields: List<Pair<String, String>>, referer: String): Page =
+        throw UnsupportedOperationException("POST не поддерживается")
 }
 
 /** Ответ вместо страницы дневника → [AuthException] (нужен вход) или ошибка HTTP. */

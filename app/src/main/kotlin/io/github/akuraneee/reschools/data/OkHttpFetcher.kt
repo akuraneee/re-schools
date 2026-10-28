@@ -13,14 +13,15 @@ import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Cookie
 import okhttp3.CookieJar
+import okhttp3.FormBody
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 
 /**
- * Запросы к schools.by через OkHttp. Куки входа общие с WebView, в котором пользователь входит на сайте:
- * приложение пароль не видит и не хранит, а сессию берёт из [CookieManager].
+ * Запросы к schools.by через OkHttp. Куки входа лежат в [CookieManager] — общие с WebView «Сайт schools.by»
+ * (и запасным входом на самом сайте); пароль приложение только отправляет в форму входа и не хранит.
  */
 class OkHttpFetcher(private val userAgent: String) : PageFetcher {
     private val client = OkHttpClient.Builder()
@@ -40,11 +41,28 @@ class OkHttpFetcher(private val userAgent: String) : PageFetcher {
             .header("Accept-Language", "ru-RU,ru;q=0.9")
             .header("Referer", Regex("^https?://[^/]+").find(url)?.value.orEmpty() + "/")
             .build()
-        return try {
-            client.newCall(request).await().use { Page(it.request.url.toString(), it.code, it.body.string()) }
-        } catch (e: IOException) {
-            throw OfflineException()
-        }
+        return execute(request)
+    }
+
+    /** Форма входа — как из браузера: без XHR-заголовка, с Origin и Referer страницы входа (их проверяет CSRF Django). */
+    override suspend fun post(url: String, fields: List<Pair<String, String>>, referer: String): Page {
+        val body = FormBody.Builder().apply { fields.forEach { (k, v) -> add(k, v) } }.build()
+        val request = Request.Builder()
+            .url(url)
+            .post(body)
+            .header("Accept", "text/html,application/xhtml+xml,*/*;q=0.8")
+            .header("User-Agent", userAgent)
+            .header("Accept-Language", "ru-RU,ru;q=0.9")
+            .header("Origin", Regex("^https?://[^/]+").find(url)?.value.orEmpty())
+            .header("Referer", referer)
+            .build()
+        return execute(request)
+    }
+
+    private suspend fun execute(request: Request): Page = try {
+        client.newCall(request).await().use { Page(it.request.url.toString(), it.code, it.body.string()) }
+    } catch (e: IOException) {
+        throw OfflineException()
     }
 
     private suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->

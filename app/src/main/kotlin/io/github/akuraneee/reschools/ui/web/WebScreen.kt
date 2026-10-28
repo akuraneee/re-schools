@@ -36,10 +36,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import io.github.akuraneee.reschools.R
 import io.github.akuraneee.reschools.core.LANDING_PATH
+import io.github.akuraneee.reschools.core.LOGIN_URL
 import io.github.akuraneee.reschools.ui.components.TooltipIconButton
 import androidx.compose.ui.res.stringResource
-
-private const val LOGIN_URL = "https://schools.by/login"
 
 private fun isSchools(u: Uri): Boolean {
     val host = u.host ?: return false

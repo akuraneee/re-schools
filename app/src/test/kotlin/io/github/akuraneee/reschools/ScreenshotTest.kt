@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import io.github.akuraneee.reschools.ui.MainScreen
 import io.github.akuraneee.reschools.ui.components.LocalNow
 import io.github.akuraneee.reschools.ui.diary.DiaryScreen
+import io.github.akuraneee.reschools.ui.login.LoginScreen
 import io.github.akuraneee.reschools.ui.settings.SettingsScreen
 import io.github.akuraneee.reschools.ui.stats.StatsScreen
 import io.github.akuraneee.reschools.ui.theme.ReSchoolsTheme
@@ -130,6 +131,12 @@ class ScreenshotTest {
 
     @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
     fun welcome() = shot("welcome") { WelcomeScreen(UiState(ready = true), {}) }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun login() = shot("login") { LoginScreen(false, null, { _, _ -> }, {}, {}, {}) }
+
+    @Test @Config(qualifiers = "w411dp-h891dp-xxhdpi")
+    fun loginError() = shot("login-error", dark = true) { LoginScreen(false, "Неверный логин или пароль.", { _, _ -> }, {}, {}, {}) }
 
     @Test @Config(qualifiers = "w1280dp-h800dp-xhdpi")
     fun homeTablet() = shot("home-tablet") { MainScreen(state(), {}, { _, _ -> }, {}, {}, {}) }

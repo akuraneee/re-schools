@@ -8,12 +8,14 @@ import androidx.lifecycle.viewModelScope
 import io.github.akuraneee.reschools.core.AuthException
 import io.github.akuraneee.reschools.core.Bells
 import io.github.akuraneee.reschools.core.HwMode
+import io.github.akuraneee.reschools.core.LoginResult
 import io.github.akuraneee.reschools.core.OfflineException
 import io.github.akuraneee.reschools.core.Persist
 import io.github.akuraneee.reschools.core.Profile
 import io.github.akuraneee.reschools.core.Pupil
 import io.github.akuraneee.reschools.core.PupilSession
 import io.github.akuraneee.reschools.core.discoverPupils
+import io.github.akuraneee.reschools.core.signIn
 import io.github.akuraneee.reschools.data.FileStore
 import io.github.akuraneee.reschools.data.OkHttpFetcher
 import java.io.File
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Всё состояние приложения; логика дневника — в ядре (`core`), здесь только связь с интерфейсом. */
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -187,17 +190,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             publish { it.copy(signingIn = true, error = null) }
             try {
-                val pupils = fetcher.discoverPupils(url)
-                if (pupils.isEmpty()) {
-                    publish { it.copy(error = UiError.Other(getApplication<Application>().getString(R.string.no_pupil_found))) }
-                } else {
-                    refreshJob?.cancel()
-                    profile.setPupils(pupils)
-                    profile.select(pupils.first().id)
-                    startSession(pupils.first())
-                    publish { it.copy(loading = false, progress = null, weekLoading = emptySet()) }
-                    refresh()
-                }
+                openLanded(url)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -206,6 +199,56 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 publish { it.copy(signingIn = false) }
             }
         }
+    }
+
+    /**
+     * Вход в приложении: форма сайта отправляется без WebView. [onDone] — дневник найден;
+     * [onNeedsBrowser] — на форме капча или незнакомая разметка, входить на самом сайте.
+     */
+    fun signIn(user: String, password: String, onDone: () -> Unit, onNeedsBrowser: () -> Unit) {
+        if (_state.value.signingIn) return
+        viewModelScope.launch(Dispatchers.IO) {
+            publish { it.copy(signingIn = true, loginError = null, error = null) }
+            val app = getApplication<Application>()
+            var done = false
+            try {
+                when (val r = fetcher.signIn(user, password)) {
+                    is LoginResult.Landed -> done = openLanded(r.url)
+                    is LoginResult.Rejected -> publish { it.copy(loginError = r.message ?: app.getString(R.string.login_rejected)) }
+                    LoginResult.NeedsBrowser -> withContext(Dispatchers.Main) { onNeedsBrowser() }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val message = when (e) {
+                    is OfflineException -> app.getString(R.string.error_offline_login)
+                    else -> app.getString(R.string.login_failed, e.message ?: e.toString())
+                }
+                publish { it.copy(loginError = message) }
+            } finally {
+                publish { it.copy(signingIn = false) }
+            }
+            if (done) withContext(Dispatchers.Main) { onDone() }
+        }
+    }
+
+    fun clearLoginError() = publish { it.copy(loginError = null) }
+
+    /** Страница [url] после входа: ищем на ней учеников и начинаем с первого. false — ученика не нашли. */
+    private suspend fun openLanded(url: String): Boolean {
+        val pupils = fetcher.discoverPupils(url)
+        if (pupils.isEmpty()) {
+            val message = getApplication<Application>().getString(R.string.no_pupil_found)
+            publish { it.copy(error = UiError.Other(message), loginError = message) }
+            return false
+        }
+        refreshJob?.cancel()
+        profile.setPupils(pupils)
+        profile.select(pupils.first().id)
+        startSession(pupils.first())
+        publish { it.copy(loading = false, progress = null, weekLoading = emptySet()) }
+        refresh()
+        return true
     }
 
     /** Перед входом в другой аккаунт забываем текущий вход на сайте. */

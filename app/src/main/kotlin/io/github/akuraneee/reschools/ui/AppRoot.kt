@@ -51,6 +51,7 @@ import io.github.akuraneee.reschools.ui.diary.DiaryScreen
 import io.github.akuraneee.reschools.ui.home.HomeScreen
 import io.github.akuraneee.reschools.ui.settings.SettingsScreen
 import io.github.akuraneee.reschools.ui.stats.StatsScreen
+import io.github.akuraneee.reschools.ui.login.LoginScreen
 import io.github.akuraneee.reschools.ui.web.WebScreen
 import io.github.akuraneee.reschools.ui.welcome.WelcomeScreen
 
@@ -58,6 +59,7 @@ private object Route {
     const val MAIN = "main"
     const val SETTINGS = "settings"
     const val LOGIN = "login"
+    const val LOGIN_WEB = "login-web"
     const val SITE = "site"
 }
 
@@ -118,6 +120,22 @@ fun AppRoot(viewModel: AppViewModel = viewModel()) {
                 )
             }
             composable(Route.LOGIN) {
+                LoginScreen(
+                    signingIn = state.signingIn,
+                    error = state.loginError,
+                    onSignIn = { user, password ->
+                        viewModel.signIn(
+                            user, password,
+                            onDone = { nav.popBackStack(Route.MAIN, inclusive = false) },
+                            onNeedsBrowser = { nav.navigate(Route.LOGIN_WEB) },
+                        )
+                    },
+                    onEdit = { if (state.loginError != null) viewModel.clearLoginError() },
+                    onViaSite = { nav.navigate(Route.LOGIN_WEB) },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable(Route.LOGIN_WEB) {
                 WebScreen(
                     loginMode = true,
                     startUrl = null,

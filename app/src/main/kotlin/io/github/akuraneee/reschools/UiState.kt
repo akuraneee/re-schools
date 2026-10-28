@@ -42,6 +42,8 @@ data class UiState(
     /** Подгрузка недель учебного года для статистики: сколько из скольких. */
     val historyProgress: Pair<Int, Int>? = null,
     val signingIn: Boolean = false,
+    /** Ошибка на экране входа (неверный пароль, нет связи). */
+    val loginError: String? = null,
     val error: UiError? = null,
 ) {
     val needLogin: Boolean get() = ready && pupil == null

@@ -18,8 +18,18 @@
     <!-- Вход -->
     <string name="welcome_title">re:schools</string>
     <string name="welcome_text">Дневник schools.by в удобном виде: отметки за сегодня, ДЗ на завтра и новые отметки с прошлого раза.</string>
-    <string name="welcome_button">Войти через schools.by</string>
-    <string name="welcome_note">Вход — на самом сайте schools.by. Приложение не видит пароль и никуда не отправляет ваши данные.</string>
+    <string name="welcome_button">Войти</string>
+    <string name="welcome_note">Логин и пароль уходят только на schools.by — приложение их не сохраняет и никуда больше не отправляет.</string>
+    <string name="login_title">Вход</string>
+    <string name="login_text">Логин и пароль от schools.by — те же, что на сайте.</string>
+    <string name="login_user">Логин</string>
+    <string name="login_password">Пароль</string>
+    <string name="login_show_password">Показать пароль</string>
+    <string name="login_hide_password">Скрыть пароль</string>
+    <string name="login_via_site">Войти на сайте</string>
+    <string name="login_rejected">Неверный логин или пароль.</string>
+    <string name="login_failed">Не удалось войти: %1$s</string>
+    <string name="error_offline_login">Нет связи с schools.by.</string>
     <string name="web_login_title">Вход в schools.by</string>
     <string name="web_site_title">Сайт schools.by</string>
     <string name="no_pupil_found">Не нашёл ученика на странице после входа.</string>
