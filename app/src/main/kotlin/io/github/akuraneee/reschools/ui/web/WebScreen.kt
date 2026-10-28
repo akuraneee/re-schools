@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
+import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -47,6 +49,10 @@ private fun isSchools(u: Uri): Boolean {
 /** Поддомен школы (не сам schools.by — там только вход). */
 private fun isSchoolHost(u: Uri) = isSchools(u) && u.host != "schools.by"
 
+/** Waydroid (Android в контейнере на Linux): производитель «Waydroid», модель «WayDroid x86_64 Device». */
+private val isWaydroid: Boolean =
+    listOf(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.DEVICE).any { it.orEmpty().contains("waydroid", ignoreCase = true) }
+
 /**
  * Сайт schools.by в WebView. В режиме входа ([loginMode]) пользователь вводит пароль на настоящей странице,
  * а после входа сайт открывает страницу ученика/родителя (`/pupil/<id>`, `/parent/<id>`) — тогда вызываем [onLanded].
@@ -62,6 +68,8 @@ fun WebScreen(loginMode: Boolean, startUrl: String?, onBack: () -> Unit, onLande
     var canGoBack by remember { mutableStateOf(false) }
     val webView = remember {
         WebView(context).also { view ->
+            // В Waydroid аппаратная отрисовка WebView часто даёт чёрный экран — там рисуем программно.
+            if (isWaydroid) view.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
             view.settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
