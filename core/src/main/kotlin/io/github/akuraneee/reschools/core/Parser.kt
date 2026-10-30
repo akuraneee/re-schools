@@ -154,12 +154,13 @@ fun parseWeek(doc: Document, week: LocalDate?): ParsedWeek {
     val seen = mutableSetOf<LocalDate>()
     val dates = mutableListOf<LocalDate>()
 
+    val monday = week?.mondayOf()
     days.forEachIndexed { i, day ->
         val htext = day.selectFirst(Sel.DAY_HEADER)?.text() ?: ""
-        val date = dateFromId(day)
-            ?: parseDayDate(htext, week)
-            ?: dateFromDayNumber(htext, week)
-            ?: week?.mondayOf()?.plusDays(i.toLong())
+        // Дата обязана попасть в неделю из адреса: иначе урок виден в «Дневнике», но статистика
+        // не найдёт четверть для чужого понедельника и молча его пропустит.
+        val date = listOfNotNull(dateFromId(day), parseDayDate(htext, week), dateFromDayNumber(htext, week), monday?.plusDays(i.toLong()))
+            .firstOrNull { monday == null || it.mondayOf() == monday }
             ?: return@forEachIndexed
         if (!seen.add(date)) return@forEachIndexed
         dates += date

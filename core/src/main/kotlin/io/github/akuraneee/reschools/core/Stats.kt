@@ -171,7 +171,7 @@ private fun trendPerMonth(marks: List<MarkPoint>): Double? {
 
 /**
  * Статистика по урокам до [today] включительно. [quarterOf] — четверть недели по её понедельнику
- * (`Diary.links`); уроки недель с неизвестной четвертью пропускаются.
+ * (`Diary.links`); неделе с неизвестной четвертью достаётся четверть ближайшей известной, остальные пропускаются.
  */
 fun computeStats(
     lessons: List<Lesson>,
@@ -181,7 +181,15 @@ fun computeStats(
 ): Stats {
     class L(val l: Lesson, val q: String)
 
-    val all = lessons.mapNotNull { l -> quarterOf(l.date.mondayOf())?.let { L(l, it) } }
+    // Неделя, чьей четверти нет в ссылках, получает четверть ближайшей недели с уроками (не дальше трёх недель):
+    // иначе её уроки видны в «Дневнике», а из статистики пропадают — вплоть до целого предмета.
+    val mondays = lessons.map { it.date.mondayOf() }.distinct().sorted()
+    val known = mondays.mapNotNull { m -> quarterOf(m)?.let { m to it } }
+    val qOf = mondays.associateWith { m ->
+        quarterOf(m) ?: known.filter { abs(daysBetween(it.first, m)) <= 21 }
+            .minByOrNull { abs(daysBetween(it.first, m)) }?.second
+    }
+    val all = lessons.mapNotNull { l -> qOf[l.date.mondayOf()]?.let { L(l, it) } }
         .sortedWith(compareBy({ it.l.date }, { it.l.num }))
 
     val ranges = HashMap<String, Pair<LocalDate, LocalDate>>()

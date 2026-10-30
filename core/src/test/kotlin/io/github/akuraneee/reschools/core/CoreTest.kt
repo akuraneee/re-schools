@@ -61,6 +61,15 @@ class ParserTest {
     }
 
     @Test
+    fun `дата дня вне недели из адреса не принимается`() {
+        val html = FakeSite(TODAY).handle("$HOST/pupil/$PID/dnevnik/quarter/92/week/2026-10-12").body
+            .replace("db_table_14.10.26", "db_table_14.10.25") // среда с чужим годом в id
+        val parsed = parseWeek(Jsoup.parse(html), d("2026-10-12"))
+        assertEquals((12..16).map { d("2026-10-$it") }, parsed.dates)
+        assertTrue(parsed.lessons.any { it.date == d("2026-10-14") && it.subject == "Рус. лит." })
+    }
+
+    @Test
     fun `ученик и дети родителя`() {
         val own = Jsoup.parse(FakeSite(TODAY).handle("$HOST/pupil/$PID").body)
         assertEquals(listOf(TEST_PUPIL), findPupils(own, "$HOST/pupil/$PID"))
@@ -260,6 +269,18 @@ class StatsTest {
         val before = site.requests.size
         diary.loadHistory(TODAY)
         assertEquals(before, site.requests.size, "повторно ничего не качаем")
+    }
+
+    @Test
+    fun `неделя без известной четверти не выпадает из статистики`() {
+        val q = { monday: LocalDate -> if (monday == d("2026-10-12")) null else "92" }
+        val lessons = listOf(
+            Lesson(d("2026-10-05"), 1, "Матем.", listOf(8)),
+            Lesson(d("2026-10-14"), 1, "Рус. лит.", listOf(9)),
+        )
+        val s = computeStats(lessons, q, TODAY)
+        assertEquals(listOf("Математика", "Русская литература"), s.subjects.map { it.name })
+        assertEquals(9.0, s.subjects.last().byQ.getValue("92")!!.avg)
     }
 
     @Test
