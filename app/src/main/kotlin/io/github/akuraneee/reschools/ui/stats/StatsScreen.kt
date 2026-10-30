@@ -1,7 +1,6 @@
 package io.github.akuraneee.reschools.ui.stats
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +17,9 @@ import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -40,6 +42,7 @@ import io.github.akuraneee.reschools.core.computeStats
 import io.github.akuraneee.reschools.ui.components.ContentMaxWidth
 import io.github.akuraneee.reschools.ui.components.SegmentedNote
 import io.github.akuraneee.reschools.ui.components.StatusBanner
+import io.github.akuraneee.reschools.ui.components.TooltipIconButton
 import io.github.akuraneee.reschools.ui.components.contentPaddingOf
 
 /**
@@ -52,7 +55,7 @@ fun StatsScreen(
     state: UiState,
     contentInsets: WindowInsets,
     onLoadHistory: () -> Unit,
-    onRetry: () -> Unit,
+    onRefresh: () -> Unit,
     onLogin: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -73,19 +76,36 @@ fun StatsScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.stats_title)) },
+                actions = {
+                    TooltipIconButton(R.drawable.ic_refresh_24, stringResource(R.string.action_refresh), onRefresh, enabled = !state.loading)
+                },
                 scrollBehavior = scrollBehavior,
                 windowInsets = contentInsets,
             )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()), contentAlignment = Alignment.TopCenter) {
+        val pullState = rememberPullToRefreshState()
+        PullToRefreshBox(
+            isRefreshing = state.loading,
+            onRefresh = onRefresh,
+            state = pullState,
+            modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
+            contentAlignment = Alignment.TopCenter,
+            indicator = {
+                PullToRefreshDefaults.LoadingIndicator(
+                    state = pullState,
+                    isRefreshing = state.loading,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
+            },
+        ) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.widthIn(max = ContentMaxWidth).fillMaxWidth(),
                 contentPadding = contentPaddingOf(padding),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                item(key = "banner") { StatusBanner(state, onRetry = onRetry, onLogin = onLogin) }
+                item(key = "banner") { StatusBanner(state, onRetry = onRefresh, onLogin = onLogin) }
                 state.historyProgress?.let { (done, total) -> item(key = "progress") { HistoryProgress(done, total) } }
                 item(key = "tabs") {
                     val titles = listOf(R.string.stats_tab_overview, R.string.stats_tab_subject, R.string.stats_tab_dynamics)

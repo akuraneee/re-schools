@@ -229,7 +229,7 @@ internal fun MainScreen(
                 state = state,
                 contentInsets = contentInsets,
                 onLoadHistory = onLoadHistory,
-                onRetry = onRefresh,
+                onRefresh = onRefresh,
                 onLogin = onLogin,
             )
         }
