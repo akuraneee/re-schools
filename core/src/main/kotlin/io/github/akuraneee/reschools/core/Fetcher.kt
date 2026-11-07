@@ -21,7 +21,7 @@ fun interface PageFetcher {
 suspend fun PageFetcher.fetchChecked(url: String): Page {
     val page = fetch(url)
     if (Regex("/login").containsMatchIn(page.url)) throw AuthException()
-    if (page.status >= 400) throw java.io.IOException("HTTP ${page.status}: $url")
+    if (page.status >= 400) throw HttpException(page.status, url)
     if (page.doc.selectFirst("input[type=password]") != null && page.doc.selectFirst(Sel.DAY) == null) throw AuthException()
     return page
 }

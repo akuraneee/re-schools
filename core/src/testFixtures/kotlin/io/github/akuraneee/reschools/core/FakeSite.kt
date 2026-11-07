@@ -50,6 +50,12 @@ class FakeSite(val today: LocalDate, var loggedIn: Boolean = true) {
 
     var version = 1
     val requests = mutableListOf<String>()
+
+    /** Пути, на которые сайт отвечает 403. */
+    val forbidden = mutableSetOf<String>()
+
+    /** Без входа сайт отвечает 403, а не переводит на страницу входа. */
+    var forbidWhenLoggedOut = false
     private val changed = HashMap<String, Int>()
 
     private val quarters: List<Quarter>
@@ -193,7 +199,8 @@ class FakeSite(val today: LocalDate, var loggedIn: Boolean = true) {
             return FakeResponse(200, login.replace("\$ERRORS", "<ul class=\"errorlist\"><li>Неверный логин или пароль</li></ul>"))
         }
         if (path == "/login") return if (loggedIn) FakeResponse(302, "", "$HOST/pupil/$PID") else FakeResponse(200, login.replace("\$ERRORS", ""))
-        if (!loggedIn) return FakeResponse(302, "", "$HOST/login")
+        if (!loggedIn) return if (forbidWhenLoggedOut) FakeResponse(403, "Доступ запрещён") else FakeResponse(302, "", "$HOST/login")
+        if (path in forbidden) return FakeResponse(403, "Доступ запрещён")
         if (path == "/pupil/$PID") return FakeResponse(200, profile)
         if (path == "/pupil/$PID/dnevnik") {
             val cur = today.mondayOf()

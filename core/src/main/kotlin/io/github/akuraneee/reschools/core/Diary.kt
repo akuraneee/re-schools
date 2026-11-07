@@ -41,6 +41,11 @@ class Diary(
     private val expanded: MutableSet<LocalDate> = ConcurrentHashMap.newKeySet()
     private var bootstrapped = false
 
+    // недели, которые сайт не отдал в этой сессии (403/404), — с ответом сайта
+    private val refused = ConcurrentHashMap<LocalDate, HttpException>()
+    // после отказа уже сверялись со страницей «Дневник» (вход жив, ссылки свежие)
+    private var rechecked = false
+
     private fun save() {
         persist.set(prefix + "links", links)
         persist.set(prefix + "weeks", weeks)
@@ -60,9 +65,14 @@ class Diary(
     }
 
     // Ответ вкладки «Дневник»: в нём ссылки на недели текущей четверти (и, возможно, сама текущая неделя).
+    // Её же открываем после отказа в неделе: если сайт не пускает и сюда, значит, пропал вход.
     private suspend fun bootstrap() {
         bootstrapped = true
-        val page = fetcher.fetchChecked("${pupil.origin}/pupil/${pupil.id}/dnevnik")
+        val page = try {
+            fetcher.fetchChecked("${pupil.origin}/pupil/${pupil.id}/dnevnik")
+        } catch (e: HttpException) {
+            if (e.status == 401 || e.status == 403) throw AuthException() else throw e
+        }
         collectLinks(page.url + " " + page.html)
         val m = Regex("weekUrl\\s*=\\s*['\"][^'\"]*/week/(\\d{4}-\\d{2}-\\d{2})").find(page.html)
         if (m != null && page.doc.selectFirst(Sel.DAY) != null) storeWeek(LocalDate.parse(m.groupValues[1]).mondayOf(), page)
@@ -77,8 +87,32 @@ class Diary(
         return week
     }
 
-    private suspend fun fetchWeek(monday: LocalDate): Week {
-        val page = fetcher.fetchChecked("${pupil.origin}/pupil/${pupil.id}/dnevnik/quarter/${links[monday]}/week/$monday")
+    /**
+     * Неделя с сайта; null — сайт в ней отказал (403/404). Тогда сверяемся со страницей «Дневник»: если и она
+     * не открывается — пропал вход ([AuthException]); если у недели там другой qid (ссылка устарела) — пробуем его.
+     * Иначе неделю пропускаем, не обрывая обновление остальных, а прежние данные о ней оставляем.
+     */
+    private suspend fun fetchWeek(monday: LocalDate, retry: Boolean = true): Week? {
+        val qid = links[monday]
+        val page = try {
+            fetcher.fetchChecked("${pupil.origin}/pupil/${pupil.id}/dnevnik/quarter/$qid/week/$monday")
+        } catch (e: HttpException) {
+            if (!e.refusal) throw e
+            if (retry && !rechecked) {
+                rechecked = true
+                val old = weeks[monday]
+                bootstrap()
+                // страница «Дневник» сама оказалась этой неделей
+                weeks[monday]?.let { if (it !== old) { refused -= monday; return it } }
+                val fresh = links[monday]
+                if (fresh != null && fresh != qid) return fetchWeek(monday, retry = false)
+            }
+            refused[monday] = e
+            expanded += monday
+            if (requestDelayMs > 0) delay(requestDelayMs)
+            return null
+        }
+        refused -= monday
         collectLinks(page.url + " " + page.html)
         val week = storeWeek(monday, page)
         save()
@@ -106,8 +140,11 @@ class Diary(
         return null
     }
 
-    /** Неделя из сети ([force]) или из кэша, если она уже загружалась в этой сессии. */
-    suspend fun loadWeek(day: LocalDate, force: Boolean = false): Week = mutex.withLock {
+    /**
+     * Неделя из сети ([force]) или из кэша, если она уже загружалась в этой сессии. Если сайт в ней отказал,
+     * возвращается прежняя копия (или пустая неделя), а со [strict] — ошибка сайта.
+     */
+    suspend fun loadWeek(day: LocalDate, force: Boolean = false, strict: Boolean = false): Week = mutex.withLock {
         val monday = day.mondayOf()
         if (!force && monday in expanded) weeks[monday]?.let { return@withLock it }
         val qid = resolve(monday)
@@ -118,7 +155,10 @@ class Diary(
             save()
             return@withLock none
         }
-        if (monday in expanded && !force) weeks.getValue(monday) else fetchWeek(monday)
+        val week = (if (monday in expanded && !force) weeks[monday] else null) ?: fetchWeek(monday)
+        if (week != null) return@withLock week
+        if (strict) throw refused.getValue(monday)
+        weeks[monday] ?: Week(emptyList(), emptyList(), clock())
     }
 
     /**
@@ -136,7 +176,7 @@ class Diary(
     }
 
     /** Забыть, что неделя уже загружалась, чтобы следующий [loadWeek] сходил в сеть. */
-    fun invalidate(monday: LocalDate) { expanded -= monday.mondayOf() }
+    fun invalidate(monday: LocalDate) { expanded -= monday.mondayOf(); rechecked = false }
 
     /**
      * Недели, которые обновляем при каждом открытии: с последнего захода (но не больше 6 недель назад,
@@ -159,7 +199,7 @@ class Diary(
     suspend fun refresh(today: LocalDate, lastVisitAt: Long?, onProgress: ((done: Int, total: Int) -> Unit)? = null) {
         val list = weeksToRefresh(today, lastVisitAt)
         // всё перекачиваем, но каждую неделю — один раз (часть грузится при поиске qid)
-        expanded.clear()
+        expanded.clear(); refused.clear(); rechecked = false
         list.forEachIndexed { i, w ->
             loadWeek(w)
             onProgress?.invoke(i + 1, list.size)
@@ -167,7 +207,7 @@ class Diary(
     }
 
     fun clear() {
-        links = emptyMap(); weeks = emptyMap(); expanded.clear(); bootstrapped = false
+        links = emptyMap(); weeks = emptyMap(); expanded.clear(); refused.clear(); bootstrapped = false; rechecked = false
         persist.remove(prefix + "links"); persist.remove(prefix + "weeks")
     }
 }

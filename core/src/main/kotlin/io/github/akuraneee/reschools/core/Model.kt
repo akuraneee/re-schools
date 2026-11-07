@@ -70,3 +70,9 @@ data class HomeworkItem(
 class AuthException : Exception("Нужно войти на schools.by")
 
 class OfflineException : Exception("Нет связи с schools.by")
+
+/** Сайт ответил ошибкой HTTP [status] на [url]. */
+class HttpException(val status: Int, val url: String) : java.io.IOException("HTTP $status: $url") {
+    /** Сайт отказал в странице (нет доступа или такой страницы), а не сломался сам. */
+    val refusal: Boolean get() = status == 401 || status == 403 || status == 404
+}

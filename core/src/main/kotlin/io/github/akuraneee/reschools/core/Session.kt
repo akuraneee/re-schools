@@ -84,7 +84,7 @@ class PupilSession(
     suspend fun openWeek(monday: LocalDate, force: Boolean = false) {
         if (force) diary.invalidate(monday)
         if (!force && diary.isFresh(monday) && diary.cached(monday) != null) return
-        diary.loadWeek(monday, force)
+        diary.loadWeek(monday, force, strict = true)
         updateVisit { it.copy(seen = snapshot(diary.weeks, it.seen?.at ?: clock.millis())) }
     }
 

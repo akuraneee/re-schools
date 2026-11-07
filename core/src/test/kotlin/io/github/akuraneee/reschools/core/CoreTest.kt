@@ -126,6 +126,45 @@ class DiaryTest {
     }
 
     @Test
+    fun `вход пропал, а сайт отвечает 403 - AuthException, а не ошибка HTTP`() = runBlocking<Unit> {
+        val site = FakeSite(TODAY)
+        val diary = diary(site)
+        diary.refresh(TODAY, null)
+        site.loggedIn = false
+        site.forbidWhenLoggedOut = true
+        assertFailsWith<AuthException> { diary.refresh(TODAY, null) }
+        assertFailsWith<AuthException> { diary(FakeSite(TODAY, loggedIn = false).apply { forbidWhenLoggedOut = true }).refresh(TODAY, null) }
+    }
+
+    @Test
+    fun `сайт не отдал одну неделю - остальные обновляются, прежняя копия остаётся`() = runBlocking<Unit> {
+        val site = FakeSite(TODAY)
+        val diary = diary(site)
+        diary.refresh(TODAY, null)
+        val old = diary.weeks.getValue(d("2026-10-12"))
+        site.forbidden += "/pupil/$PID/dnevnik/quarter/92/week/2026-10-12"
+        val (prev, _) = site.bump()
+        diary.refresh(TODAY, null)
+        assertEquals(old.lessons, diary.weeks.getValue(d("2026-10-12")).lessons, "копия недели не стёрта")
+        assertTrue(diary.allLessons().any { it.date == prev && 10 in it.marks }, "остальные недели обновились")
+        // открытая в дневнике неделя показывает ошибку сайта
+        assertFailsWith<HttpException> { diary.loadWeek(d("2026-10-12"), force = true, strict = true) }
+    }
+
+    @Test
+    fun `устаревший номер четверти - берём свежий со страницы Дневник`() = runBlocking {
+        val site = FakeSite(TODAY)
+        val persist = Persist(MemoryStore())
+        persist.set("$PID:links", mapOf(d("2026-10-12") to "77", d("2026-10-19") to "77"))
+        val diary = diary(site, persist)
+        diary.refresh(TODAY, null)
+        assertEquals("92", diary.links[d("2026-10-12")])
+        assertEquals("92", diary.links[d("2026-10-19")])
+        assertTrue(diary.weeks.getValue(d("2026-10-12")).lessons.size > 20, "неделя загружена по свежей ссылке")
+        assertTrue(diary.weeks.getValue(d("2026-10-19")).lessons.size > 20)
+    }
+
+    @Test
     fun `недели для обновления - с последнего захода, не больше шести недель`() {
         val diary = diary(FakeSite(TODAY))
         assertEquals(listOf("2026-10-19", "2026-10-26", "2026-10-12").map(::d), diary.weeksToRefresh(TODAY, null))
