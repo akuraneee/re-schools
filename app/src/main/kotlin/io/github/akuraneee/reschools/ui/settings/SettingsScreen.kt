@@ -1,14 +1,13 @@
 package io.github.akuraneee.reschools.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,7 +43,6 @@ import io.github.akuraneee.reschools.core.Bells
 import io.github.akuraneee.reschools.core.HwMode
 import io.github.akuraneee.reschools.core.Ru
 import io.github.akuraneee.reschools.core.formatMean
-import io.github.akuraneee.reschools.ui.components.ContentMaxWidth
 import io.github.akuraneee.reschools.ui.components.SectionHeader
 import io.github.akuraneee.reschools.ui.components.SegmentedList
 import io.github.akuraneee.reschools.ui.components.TooltipIconButton
@@ -79,9 +77,9 @@ fun SettingsScreen(
             )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()), contentAlignment = Alignment.TopCenter) {
+        BoxWithConstraints(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
             LazyColumn(
-                modifier = Modifier.widthIn(max = ContentMaxWidth).fillMaxWidth(),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = contentPaddingOf(padding),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {

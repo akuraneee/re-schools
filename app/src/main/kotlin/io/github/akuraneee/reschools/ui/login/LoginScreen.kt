@@ -83,12 +83,15 @@ fun LoginScreen(
             )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding).imePadding(), contentAlignment = Alignment.TopCenter) {
+        // Прокрутка — у всей области, а не у узкой колонки: на планшете листается и за полями
+        Box(
+            Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()),
+            contentAlignment = Alignment.TopCenter,
+        ) {
             Column(
                 modifier = Modifier
                     .widthIn(max = 480.dp)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {

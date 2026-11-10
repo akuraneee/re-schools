@@ -3,6 +3,7 @@ package io.github.akuraneee.reschools.ui.components
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import io.github.akuraneee.reschools.R
 import io.github.akuraneee.reschools.core.Lesson
@@ -55,13 +57,22 @@ val ContentMaxWidth = 640.dp
 /**
  * Отступы содержимого списка: то, что дал Scaffold (системные панели, app bar), плюс собственные поля.
  * Верхний отступ Scaffold применяем снаружи (к самому списку), поэтому здесь только боковые и нижний.
+ *
+ * Сам список растянут на всю ширину [BoxWithConstraints], а на широком экране содержимое сужается до
+ * [ContentMaxWidth] боковыми отступами — так листать можно и за полями по бокам, а не только по карточкам.
  */
 @Composable
-fun contentPaddingOf(scaffold: PaddingValues, horizontal: Dp = 16.dp, top: Dp = 8.dp, bottom: Dp = 24.dp): PaddingValues {
+fun BoxWithConstraintsScope.contentPaddingOf(
+    scaffold: PaddingValues,
+    horizontal: Dp = 16.dp,
+    top: Dp = 8.dp,
+    bottom: Dp = 24.dp,
+): PaddingValues {
     val direction = LocalLayoutDirection.current
+    val side = ((maxWidth - ContentMaxWidth) / 2).coerceAtLeast(0.dp)
     return PaddingValues(
-        start = horizontal + scaffold.calculateStartPadding(direction),
-        end = horizontal + scaffold.calculateEndPadding(direction),
+        start = side + horizontal + scaffold.calculateStartPadding(direction),
+        end = side + horizontal + scaffold.calculateEndPadding(direction),
         top = top,
         bottom = bottom + scaffold.calculateBottomPadding(),
     )

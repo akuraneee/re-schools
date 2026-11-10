@@ -1,12 +1,12 @@
 package io.github.akuraneee.reschools.ui.stats
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import io.github.akuraneee.reschools.R
 import io.github.akuraneee.reschools.UiState
 import io.github.akuraneee.reschools.core.computeStats
-import io.github.akuraneee.reschools.ui.components.ContentMaxWidth
 import io.github.akuraneee.reschools.ui.components.SegmentedNote
 import io.github.akuraneee.reschools.ui.components.StatusBanner
 import io.github.akuraneee.reschools.ui.components.TooltipIconButton
@@ -90,7 +89,6 @@ fun StatsScreen(
             onRefresh = onRefresh,
             state = pullState,
             modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
-            contentAlignment = Alignment.TopCenter,
             indicator = {
                 PullToRefreshDefaults.LoadingIndicator(
                     state = pullState,
@@ -99,30 +97,32 @@ fun StatsScreen(
                 )
             },
         ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.widthIn(max = ContentMaxWidth).fillMaxWidth(),
-                contentPadding = contentPaddingOf(padding),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-            ) {
-                item(key = "banner") { StatusBanner(state, onRetry = onRefresh, onLogin = onLogin) }
-                state.historyProgress?.let { (done, total) -> item(key = "progress") { HistoryProgress(done, total) } }
-                item(key = "tabs") {
-                    val titles = listOf(R.string.stats_tab_overview, R.string.stats_tab_subject, R.string.stats_tab_dynamics)
-                    PrimaryTabRow(selectedTabIndex = tab) {
-                        titles.forEachIndexed { i, title ->
-                            Tab(selected = i == tab, onClick = { tab = i }, text = { Text(stringResource(title)) })
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = contentPaddingOf(padding),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    item(key = "banner") { StatusBanner(state, onRetry = onRefresh, onLogin = onLogin) }
+                    state.historyProgress?.let { (done, total) -> item(key = "progress") { HistoryProgress(done, total) } }
+                    item(key = "tabs") {
+                        val titles = listOf(R.string.stats_tab_overview, R.string.stats_tab_subject, R.string.stats_tab_dynamics)
+                        PrimaryTabRow(selectedTabIndex = tab) {
+                            titles.forEachIndexed { i, title ->
+                                Tab(selected = i == tab, onClick = { tab = i }, text = { Text(stringResource(title)) })
+                            }
                         }
                     }
-                }
-                if (stats.subjects.isEmpty()) {
-                    item(key = "none") { SegmentedNote(stringResource(R.string.stats_none)) }
-                } else {
-                    val subject = stats.subjects.firstOrNull { it.key == subjectKey } ?: stats.subjects.first()
-                    when (tab) {
-                        0 -> overviewItems(stats, sortKey, onSort = { sortKey = it }, onOpenSubject = { subjectKey = it; tab = 1 })
-                        1 -> subjectItems(stats, subject, onPick = { subjectKey = it }, whatIf = whatIf, onWhatIf = { whatIf = it })
-                        else -> dynamicsItems(stats, onOpenSubject = { subjectKey = it; tab = 1 })
+                    if (stats.subjects.isEmpty()) {
+                        item(key = "none") { SegmentedNote(stringResource(R.string.stats_none)) }
+                    } else {
+                        val subject = stats.subjects.firstOrNull { it.key == subjectKey } ?: stats.subjects.first()
+                        when (tab) {
+                            0 -> overviewItems(stats, sortKey, onSort = { sortKey = it }, onOpenSubject = { subjectKey = it; tab = 1 })
+                            1 -> subjectItems(stats, subject, onPick = { subjectKey = it }, whatIf = whatIf, onWhatIf = { whatIf = it })
+                            else -> dynamicsItems(stats, onOpenSubject = { subjectKey = it; tab = 1 })
+                        }
                     }
                 }
             }

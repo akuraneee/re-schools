@@ -1,6 +1,7 @@
 package io.github.akuraneee.reschools.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -62,7 +62,6 @@ import io.github.akuraneee.reschools.core.homeworkFor
 import io.github.akuraneee.reschools.core.nextSchoolDay
 import io.github.akuraneee.reschools.core.subjectTitle
 import io.github.akuraneee.reschools.core.todayMarks
-import io.github.akuraneee.reschools.ui.components.ContentMaxWidth
 import io.github.akuraneee.reschools.ui.components.EmptyNote
 import io.github.akuraneee.reschools.ui.components.BreakCard
 import io.github.akuraneee.reschools.ui.components.LessonNowCard
@@ -137,9 +136,9 @@ fun HomeScreen(
 @Composable
 private fun HomeContent(state: UiState, padding: PaddingValues, onRefresh: () -> Unit, onLogin: () -> Unit) {
     val now = rememberNowInfo(state.lessons, state.today, state.settings.bells)
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
         LazyColumn(
-            modifier = Modifier.widthIn(max = ContentMaxWidth).fillMaxWidth(),
+            modifier = Modifier.fillMaxSize(),
             contentPadding = contentPaddingOf(padding),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {

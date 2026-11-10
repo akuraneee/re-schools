@@ -2,10 +2,12 @@ package io.github.akuraneee.reschools.ui.welcome
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -43,58 +45,63 @@ import io.github.akuraneee.reschools.ui.components.StatusBanner
 @Composable
 fun WelcomeScreen(state: UiState, onLogin: () -> Unit, modifier: Modifier = Modifier) {
     Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing), contentAlignment = Alignment.Center) {
-            Column(
-                modifier = Modifier
-                    .widthIn(max = 480.dp)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            // Прокрутка — у всей области (и за полями на планшете), а пока всё влезает — по центру экрана
+            Box(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight),
+                contentAlignment = Alignment.Center,
             ) {
-                Surface(
-                    modifier = Modifier.size(144.dp),
-                    shape = MaterialShapes.Cookie9Sided.toShape(),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 480.dp)
+                        .padding(horizontal = 24.dp, vertical = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(painterResource(R.drawable.ic_menu_book_fill_48), contentDescription = null, modifier = Modifier.size(64.dp))
-                    }
-                }
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = stringResource(R.string.welcome_title),
-                    style = MaterialTheme.typography.displaySmallEmphasized,
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    text = stringResource(R.string.welcome_text),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.size(8.dp))
-                if (state.signingIn) {
-                    LoadingIndicator()
-                } else {
-                    val size = ButtonDefaults.MediumContainerHeight
-                    Button(
-                        onClick = onLogin,
-                        shapes = ButtonDefaults.shapesFor(size),
-                        contentPadding = ButtonDefaults.contentPaddingFor(size),
-                        modifier = Modifier.heightIn(size),
+                    Surface(
+                        modifier = Modifier.size(144.dp),
+                        shape = MaterialShapes.Cookie9Sided.toShape(),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     ) {
-                        Text(stringResource(R.string.welcome_button), style = ButtonDefaults.textStyleFor(size))
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(painterResource(R.drawable.ic_menu_book_fill_48), contentDescription = null, modifier = Modifier.size(64.dp))
+                        }
                     }
+                    Spacer(Modifier.size(8.dp))
+                    Text(
+                        text = stringResource(R.string.welcome_title),
+                        style = MaterialTheme.typography.displaySmallEmphasized,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        text = stringResource(R.string.welcome_text),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    if (state.signingIn) {
+                        LoadingIndicator()
+                    } else {
+                        val size = ButtonDefaults.MediumContainerHeight
+                        Button(
+                            onClick = onLogin,
+                            shapes = ButtonDefaults.shapesFor(size),
+                            contentPadding = ButtonDefaults.contentPaddingFor(size),
+                            modifier = Modifier.heightIn(size),
+                        ) {
+                            Text(stringResource(R.string.welcome_button), style = ButtonDefaults.textStyleFor(size))
+                        }
+                    }
+                    StatusBanner(state, onRetry = onLogin, onLogin = onLogin)
+                    Text(
+                        text = stringResource(R.string.welcome_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
                 }
-                StatusBanner(state, onRetry = onLogin, onLogin = onLogin)
-                Text(
-                    text = stringResource(R.string.welcome_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
             }
         }
     }

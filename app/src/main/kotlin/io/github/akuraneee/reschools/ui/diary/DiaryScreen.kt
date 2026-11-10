@@ -1,6 +1,7 @@
 package io.github.akuraneee.reschools.ui.diary
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -200,8 +201,6 @@ private fun WeekPage(monday: LocalDate, state: UiState, padding: PaddingValues, 
 @Composable
 private fun WeekContent(monday: LocalDate, week: Week, today: LocalDate, padding: PaddingValues, isCurrentWeek: Boolean, bells: Bells) {
     val listState = rememberLazyListState()
-    // запас снизу, чтобы кнопка «Сегодня» не закрывала последнюю строку
-    val contentPadding = contentPaddingOf(padding, bottom = 96.dp)
     val days = remember(week) {
         val dates = (week.dates + week.lessons.map { it.date }).toSortedSet()
         dates.map { date -> date to week.lessons.filter { it.date == date }.sortedBy { it.num } }
@@ -212,11 +211,12 @@ private fun WeekContent(monday: LocalDate, week: Week, today: LocalDate, padding
     LaunchedEffect(isCurrentWeek, todayIndex) {
         if (isCurrentWeek && todayIndex > 0) listState.scrollToItem(todayIndex)
     }
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.widthIn(max = ContentMaxWidth).fillMaxWidth(),
-            contentPadding = contentPadding,
+            modifier = Modifier.fillMaxSize(),
+            // запас снизу, чтобы кнопка «Сегодня» не закрывала последнюю строку
+            contentPadding = contentPaddingOf(padding, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             when {
