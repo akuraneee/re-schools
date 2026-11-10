@@ -16,11 +16,31 @@ fun roundMark(avg: Double, threshold: Double = 0.5): Int {
     return (if (avg - f >= threshold - 1e-9) f.toInt() + 1 else f.toInt()).coerceIn(1, 10)
 }
 
-/** Четверть: [order] — по порядку начала, [start]/[end] — первый и последний день с уроками. */
-data class Quarter(val id: String, val order: Int, val start: LocalDate, val end: LocalDate) {
-    val name: String get() = "${order + 1} четверть"
-    val short: String get() = "${order + 1} четв."
+/**
+ * Четверть: [number] — номер в учебном году (по календарю, а не по порядку среди загруженных: если первая
+ * четверть не загрузилась, вторая всё равно «2 четверть»), [start]/[end] — первый и последний день с уроками.
+ */
+data class Quarter(val id: String, val number: Int, val start: LocalDate, val end: LocalDate) {
+    val name: String get() = "$number четверть"
+    val short: String get() = "$number четв."
 }
+
+/**
+ * Номер четверти, к которой по календарю школ Беларуси относится учебный день: первая кончается до начала
+ * ноября, вторая — в конце декабря, третья — около 20 марта, четвёртая — в конце мая.
+ */
+fun calendarQuarter(date: LocalDate): Int {
+    val md = date.monthValue * 100 + date.dayOfMonth
+    return when {
+        md in 801..1103 -> 1
+        md >= 1104 || md <= 105 -> 2
+        md <= 327 -> 3
+        else -> 4
+    }
+}
+
+// Каникулы короче недели не бывают, а внутри четверти уроков нет самое большее дня три-четыре.
+private const val BREAK_DAYS = 5
 
 data class Summary(
     val n: Int,
@@ -189,16 +209,34 @@ fun computeStats(
         quarterOf(m) ?: known.filter { abs(daysBetween(it.first, m)) <= 21 }
             .minByOrNull { abs(daysBetween(it.first, m)) }?.second
     }
-    val all = lessons.mapNotNull { l -> qOf[l.date.mondayOf()]?.let { L(l, it) } }
+    var all = lessons.mapNotNull { l -> qOf[l.date.mondayOf()]?.let { L(l, it) } }
         .sortedWith(compareBy({ it.l.date }, { it.l.num }))
 
-    val ranges = HashMap<String, Pair<LocalDate, LocalDate>>()
-    for (x in all) {
-        val r = ranges[x.q]
-        ranges[x.q] = if (r == null) x.l.date to x.l.date else minOf(r.first, x.l.date) to maxOf(r.second, x.l.date)
+    // Четверти — по qid, но если под одним qid оказались уроки по разные стороны каникул (первая и вторая
+    // четверть), такой qid делится на части: иначе вторая четверть так и считалась бы первой.
+    val segOf = HashMap<L, String>()
+    val ranges = LinkedHashMap<String, Pair<LocalDate, LocalDate>>()
+    for ((qid, list) in all.groupBy { it.q }) {
+        var part = 0
+        var prev: LocalDate? = null
+        for (x in list) {
+            val p = prev
+            if (p != null && daysBetween(p, x.l.date) >= BREAK_DAYS && calendarQuarter(x.l.date) > calendarQuarter(p)) part++
+            prev = x.l.date
+            val id = if (part == 0) qid else "$qid#${part + 1}"
+            segOf[x] = id
+            val r = ranges[id]
+            ranges[id] = if (r == null) x.l.date to x.l.date else r.first to x.l.date
+        }
     }
-    val quarters = ranges.entries.sortedBy { it.value.first }
-        .mapIndexed { i, e -> Quarter(e.key, i, e.value.first, e.value.second) }
+    all = all.map { x -> segOf.getValue(x).let { if (it == x.q) x else L(x.l, it) } }
+
+    // Номер — по календарю (по последнему дню с уроками), но не меньше, чем у предыдущей четверти плюс один.
+    var lastNumber = 0
+    val quarters = ranges.entries.sortedBy { it.value.first }.map { (id, r) ->
+        lastNumber = max(calendarQuarter(r.second), lastNumber + 1)
+        Quarter(id, lastNumber, r.first, r.second)
+    }
 
     // Текущая четверть — последняя, в которой уже есть прошедшие уроки.
     val current = quarters.lastOrNull { q -> all.any { it.q == q.id && it.l.date <= today } }?.id

@@ -311,6 +311,54 @@ class StatsTest {
         assertEquals(roundMark(7.49), 7)
         assertEquals(roundMark(7.5), 8)
         assertEquals(roundMark(7.3, 0.3), 8)
+        assertEquals(listOf("1 четверть", "2 четверть"), s.quarters.map { it.name })
+    }
+
+    @Test
+    fun `номер четверти - по календарю, даже если первая не загружена`() {
+        val nov = d("2026-11-10")
+        val lessons = listOf(Lesson(d("2026-11-09"), 1, "Матем.", listOf(8)), Lesson(nov, 1, "Физика", listOf(7)))
+        val s = computeStats(lessons, { "93" }, nov)
+        assertEquals(listOf("2 четверть"), s.quarters.map { it.name })
+        assertEquals("2 четв.", s.currentQuarter!!.short)
+        assertEquals(listOf(1, 2, 3, 4), listOf("2026-10-30", "2026-12-26", "2027-03-20", "2027-05-29").map { calendarQuarter(d(it)) })
+    }
+
+    @Test
+    fun `один qid по обе стороны каникул - две четверти`() {
+        val nov = d("2026-11-10")
+        val lessons = listOf(
+            Lesson(d("2026-10-05"), 1, "Матем.", listOf(6)),
+            Lesson(d("2026-10-30"), 1, "Матем.", listOf(8)),
+            Lesson(d("2026-11-09"), 1, "Матем.", listOf(10)),
+        )
+        val s = computeStats(lessons, { "92" }, nov)
+        assertEquals(listOf("1 четверть", "2 четверть"), s.quarters.map { it.name })
+        assertEquals(s.quarters[1].id, s.current)
+        val math = s.subjects.single()
+        assertEquals(7.0, math.byQ.getValue(s.quarters[0].id)!!.avg)
+        assertEquals(10.0, math.current!!.avg)
+        assertEquals(2, math.year.quarters)
+    }
+
+    @Test
+    fun `во второй четверти загружаются обе, а недели начала года, ошибочно отмеченные пустыми, - повторно`() = runBlocking {
+        val nov = d("2026-11-10")
+        val site = FakeSite(nov)
+        val persist = Persist(MemoryStore())
+        // кэш от прошлой версии: сентябрь «отсутствует»
+        persist.set("$PID:weeks", listOf("2026-08-31", "2026-09-07").associate { d(it) to Week(emptyList(), emptyList(), 0, none = true) })
+        val diary = diary(site, persist)
+        diary.refresh(nov, null)
+        diary.loadHistory(nov)
+        assertTrue(diary.weeks.getValue(d("2026-09-07")).lessons.isNotEmpty(), "сентябрь загружен заново")
+        assertTrue(diary.weeks.getValue(d("2026-10-26")).none, "каникулы остаются пустыми")
+        val s = computeStats(diary.allLessons(), { diary.links[it] }, nov)
+        assertEquals(listOf("92" to "1 четверть", "93" to "2 четверть"), s.quarters.map { it.id to it.name })
+        assertEquals("93", s.current)
+        val before = site.requests.size
+        diary(site, persist).loadHistory(nov)
+        assertEquals(before, site.requests.size, "каникулы повторно не перепроверяем")
     }
 }
 

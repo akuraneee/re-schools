@@ -33,6 +33,9 @@ class Diary(
     @Volatile var links: Map<LocalDate, String> = persist.get<Map<LocalDate, String>>(prefix + "links") ?: emptyMap()
         private set
 
+    // недели, чей qid взят с их собственной страницы (quarter_id): ссылки с соседних недель его не перебивают
+    private var confirmed: Set<LocalDate> = persist.get<Set<LocalDate>>(prefix + "confirmed") ?: emptySet()
+
     /** понедельник → неделя */
     @Volatile var weeks: Map<LocalDate, Week> = persist.get<Map<LocalDate, Week>>(prefix + "weeks") ?: emptyMap()
         private set
@@ -43,6 +46,7 @@ class Diary(
 
     private fun save() {
         persist.set(prefix + "links", links)
+        persist.set(prefix + "confirmed", confirmed)
         persist.set(prefix + "weeks", weeks)
     }
 
@@ -57,6 +61,7 @@ class Diary(
 
     private fun collectLinks(text: String) {
         links = links + weekRe.findAll(text).associate { LocalDate.parse(it.groupValues[2]).mondayOf() to it.groupValues[1] }
+            .filterKeys { it !in confirmed }
     }
 
     // Ответ вкладки «Дневник»: в нём ссылки на недели текущей четверти (и, возможно, сама текущая неделя).
@@ -70,6 +75,11 @@ class Diary(
     }
 
     private fun storeWeek(monday: LocalDate, page: Page): Week {
+        // Своя четверть недели — из её страницы (var quarter_id = '…'), а не из ссылки «следующая неделя» соседки.
+        Regex("quarter_id\\s*=\\s*['\"](\\d+)['\"]").find(page.html)?.let {
+            links = links + (monday to it.groupValues[1])
+            confirmed = confirmed + monday
+        }
         val parsed = parseWeek(page.doc, monday)
         val week = Week(parsed.lessons, parsed.dates, clock())
         weeks = weeks + (monday to week)
@@ -124,11 +134,15 @@ class Diary(
     /**
      * Недели учебного года до текущей, которых ещё нет в кэше (для статистики за год). Идём от новых к старым:
      * ссылка «предыдущая неделя» уже подсказывает qid следующей. Загруженные раньше недели не перекачиваем.
+     * Недели раньше первой загруженной с уроками, помеченные как отсутствующие, пробуем снова: начало года
+     * (первая четверть) не может отсутствовать, значит, в прошлый раз до него просто не дошли.
      */
     suspend fun loadHistory(today: LocalDate, onProgress: ((done: Int, total: Int) -> Unit)? = null) {
         val start = LocalDate.of(if (today.monthValue >= 8) today.year else today.year - 1, 9, 1).mondayOf()
+        val first = weeks.filter { (m, w) -> m >= start && w.lessons.isNotEmpty() }.keys.minOrNull()
         val missing = generateSequence(today.mondayOf().minusWeeks(1)) { it.minusWeeks(1) }
-            .takeWhile { it >= start }.filter { weeks[it] == null }.toList()
+            .takeWhile { it >= start }
+            .filter { m -> weeks[m].let { it == null || (it.none && (first == null || m < first)) } }.toList()
         missing.forEachIndexed { i, w ->
             loadWeek(w)
             onProgress?.invoke(i + 1, missing.size)
@@ -167,7 +181,7 @@ class Diary(
     }
 
     fun clear() {
-        links = emptyMap(); weeks = emptyMap(); expanded.clear(); bootstrapped = false
-        persist.remove(prefix + "links"); persist.remove(prefix + "weeks")
+        links = emptyMap(); weeks = emptyMap(); confirmed = emptySet(); expanded.clear(); bootstrapped = false
+        persist.remove(prefix + "links"); persist.remove(prefix + "weeks"); persist.remove(prefix + "confirmed")
     }
 }
